@@ -18,7 +18,7 @@
 package connections
 
 import (
-	"nbpy/thirdpartys/errors"
+	"nbpy/thirdpartys/errorstack"
 	"net"
 	"bytes"
 	"nbpy/codecs"
@@ -50,7 +50,7 @@ func (receiver *Connection) RegisterCodec(codec *codecs.Codec) (error) {
 
 	_, ok := receiver.collectionCodecs[k]
 	if ok {
-		return errors.Errorf("The codec protocol %d and version %d is exists.", codec.Protocol, codec.Version)
+		return errorstack.Errorf("The codec protocol %d and version %d is exists.", codec.Protocol, codec.Version)
 	}
 
 	receiver.collectionCodecs[k] = codec
@@ -66,7 +66,7 @@ func (receiver *Connection) FindCodec(protocol uint16, version uint16) (error, *
 	if ok {
 		return nil, t
 	}
-	return errors.Errorf("Codec protocol %d and version %d is not exists.", protocol, version), nil
+	return errorstack.Errorf("Codec protocol %d and version %d is not exists.", protocol, version), nil
 }
 
 func (receiver *Connection) SetProtocol(tp, ver uint16) {
@@ -87,7 +87,7 @@ func (receiver Connection) ParsePacket() error{
 
 	//如果没有设定数据到达回调，则直接退出处理
 	if receiver.OnReceive == nil {
-		return errors.Errorf("OnReceive is not exists")
+		return errorstack.Errorf("OnReceive is not exists")
 	}
 
 	for {
@@ -167,7 +167,7 @@ func (receiver Connection) Lookup(interval int) error{
 
 		if err != nil {
 			receiver.recvch <- ReceiveAction{err, &recvbuffer}
-			return errors.Errorf("Error at fd.Read.")
+			return errorstack.Errorf("Error at fd.Read.")
 		}
 	}
 	utils.LogVerbose("<<< 退出数据通信处理协程 (0x%X)", receiver.Id)

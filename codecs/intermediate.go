@@ -2,7 +2,7 @@ package codecs
 
 import (
 	"encoding/binary"
-	"nbpy/thirdpartys/errors"
+	"nbpy/thirdpartys/errorstack"
 	"math"
 	"bytes"
 	"reflect"
@@ -36,7 +36,7 @@ type EncoderIMv1 struct {
 
 func (receiver DecoderIMv1) Decode(raw []byte) (error, IMData, []byte){
 	if len(raw) < IMDataHeaderLength {
-		return errors.Errorf("The length of the head data is not enough to be decoded"), nil, raw
+		return errorstack.Errorf("The length of the head data is not enough to be decoded"), nil, raw
 	}
 
 	dataType := int(raw[0])
@@ -46,7 +46,7 @@ func (receiver DecoderIMv1) Decode(raw []byte) (error, IMData, []byte){
 	case IMDataTypeList:
 		return receiver.readSlice(raw)
 	default:
-		return errors.Errorf("Type %b is not supported", dataType), nil, raw
+		return errorstack.Errorf("Type %b is not supported", dataType), nil, raw
 	}
 	return nil, nil, raw
 }
@@ -76,7 +76,7 @@ func (receiver DecoderIMv1) readMemoryData(data []byte, dt int, size uint32) (er
 		} else if size == 4 {
 			return nil, int(binary.LittleEndian.Uint32(data[:size])), data[size:]
 		} else {
-			return errors.Errorf("The long data size %d is not valid", size), nil, data
+			return errorstack.Errorf("The long data size %d is not valid", size), nil, data
 		}
 	case IMDataTypeShort:
 		return nil, int16(binary.LittleEndian.Uint16(data[:size])), data[size:]
@@ -88,7 +88,7 @@ func (receiver DecoderIMv1) readMemoryData(data []byte, dt int, size uint32) (er
 	case IMDataTypeMemory:
 		return nil, data, data[size:]
 	default:
-		return errors.Errorf("Type %b is not supported", dt), nil, data
+		return errorstack.Errorf("Type %b is not supported", dt), nil, data
 	}
 	return nil, nil, data
 }
@@ -176,7 +176,7 @@ func (receiver EncoderIMv1) encodeValueHeader(data *IMData) (error, []byte){
 				size = uint32(len(tlist))
 				tp = IMDataTypeList
 			} else {
-				return errors.Errorf("Type %s is not supported", reflect.ValueOf(data).Type().Kind()), nil
+				return errorstack.Errorf("Type %s is not supported", reflect.ValueOf(data).Type().Kind()), nil
 			}
 		}
 	}
@@ -259,7 +259,7 @@ func (receiver EncoderIMv1) encodeValueWithoutHeader(data *IMData) (error, []byt
 				}
 				b = buff.Bytes()
 			} else {
-				return errors.Errorf("Type %s is not supported", reflect.ValueOf(data).Type().String()), nil
+				return errorstack.Errorf("Type %s is not supported", reflect.ValueOf(data).Type().String()), nil
 			}
 		}
 	}

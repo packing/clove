@@ -22,7 +22,7 @@ import (
 	"encoding/binary"
 	"hash/crc32"
 	"nbpy/codecs"
-	"nbpy/thirdpartys/errors"
+	"nbpy/thirdpartys/errorstack"
 )
 
 /*
@@ -88,16 +88,16 @@ func (receiver PacketParser) unCompress(in []byte, rawlen int) (error, []byte){
 func (receiver PacketParser) popOldStylePacket() (error, *Packet) {
 	packetlen := int(binary.LittleEndian.Uint32(receiver.Raw.Bytes()[8:12]))
 	if packetlen > receiver.Raw.Len() {
-		return errors.Errorf("Data length is not enough"), nil
+		return errorstack.Errorf("Data length is not enough"), nil
 	}
 
 	data := make([]byte, packetlen)
 	readlen, err := receiver.Raw.Read(data)
 	if err != nil {
-		return errors.Errorf("Buffer error> %s", err.Error()), nil
+		return errorstack.Errorf("Buffer error> %s", err.Error()), nil
 	}
 	if readlen != packetlen {
-		return errors.Errorf("Data length is not match"), nil
+		return errorstack.Errorf("Data length is not match"), nil
 	}
 	packet := new(Packet)
 	packet.Mask = binary.LittleEndian.Uint16(data)
@@ -134,16 +134,16 @@ func (receiver PacketParser) popOldStylePacket() (error, *Packet) {
 func (receiver PacketParser) popNewStylePacket() (error, *Packet) {
 	packetlen := int(binary.LittleEndian.Uint32(receiver.Raw.Bytes()[8:12]))
 	if packetlen > receiver.Raw.Len() {
-		return errors.Errorf("Data length is not enough"), nil
+		return errorstack.Errorf("Data length is not enough"), nil
 	}
 
 	data := make([]byte, packetlen)
 	readlen, err := receiver.Raw.Read(data)
 	if err != nil {
-		return errors.Errorf("Buffer error> %s", err.Error()), nil
+		return errorstack.Errorf("Buffer error> %s", err.Error()), nil
 	}
 	if readlen != packetlen {
-		return errors.Errorf("Data length is not match"), nil
+		return errorstack.Errorf("Data length is not match"), nil
 	}
 	packet := new(Packet)
 	packet.Mask = binary.LittleEndian.Uint16(data)
@@ -171,7 +171,7 @@ func (receiver PacketParser) popNewStylePacket() (error, *Packet) {
 
 func (receiver PacketParser) Pop() (error, *Packet) {
 	if receiver.Raw.Len() < PacketHeaderLength {
-		return errors.Errorf("Header length is not enough"), nil
+		return errorstack.Errorf("Header length is not enough"), nil
 	}
 	if binary.LittleEndian.Uint16(receiver.Raw.Bytes()) == MaskNewStylePacket {
 		//使用新风格
@@ -234,18 +234,18 @@ func GetDecoder(protocolType, protocolVer uint16, data []byte) (error, codecs.De
 		case 1:
 			return nil, codecs.DecoderIMv1{}
 		default:
-			return errors.Errorf("Protocol %d(%d) is not supported", protocolType, protocolVer), nil
+			return errorstack.Errorf("Protocol %d(%d) is not supported", protocolType, protocolVer), nil
 		}
 	case codecs.ProtocolJSON:
 		switch protocolVer {
 		case 1:
 			return nil, codecs.DecoderJSONv1{}
 		default:
-			return errors.Errorf("Protocol %d(%d) is not supported", protocolType, protocolVer), nil
+			return errorstack.Errorf("Protocol %d(%d) is not supported", protocolType, protocolVer), nil
 		}
 	default:
 
 	}
 
-	return errors.Errorf("Protocol %d(%d) is not supported", protocolType, protocolVer), nil
+	return errorstack.Errorf("Protocol %d(%d) is not supported", protocolType, protocolVer), nil
 }
