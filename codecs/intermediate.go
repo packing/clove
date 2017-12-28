@@ -1,8 +1,25 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package codecs
 
 import (
 	"encoding/binary"
-	"nbpy/thirdpartys/errorstack"
+	"nbpy/errors"
 	"math"
 	"bytes"
 	"reflect"
@@ -36,7 +53,7 @@ type EncoderIMv1 struct {
 
 func (receiver DecoderIMv1) Decode(raw []byte) (error, IMData, []byte){
 	if len(raw) < IMDataHeaderLength {
-		return errorstack.Errorf("The length of the head data is not enough to be decoded"), nil, raw
+		return errors.Errorf("The length of the head data is not enough to be decoded"), nil, raw
 	}
 
 	dataType := int(raw[0])
@@ -46,7 +63,7 @@ func (receiver DecoderIMv1) Decode(raw []byte) (error, IMData, []byte){
 	case IMDataTypeList:
 		return receiver.readSlice(raw)
 	default:
-		return errorstack.Errorf("Type %b is not supported", dataType), nil, raw
+		return errors.Errorf("Type %b is not supported", dataType), nil, raw
 	}
 	return nil, nil, raw
 }
@@ -76,7 +93,7 @@ func (receiver DecoderIMv1) readMemoryData(data []byte, dt int, size uint32) (er
 		} else if size == 4 {
 			return nil, int(binary.LittleEndian.Uint32(data[:size])), data[size:]
 		} else {
-			return errorstack.Errorf("The long data size %d is not valid", size), nil, data
+			return errors.Errorf("The long data size %d is not valid", size), nil, data
 		}
 	case IMDataTypeShort:
 		return nil, int16(binary.LittleEndian.Uint16(data[:size])), data[size:]
@@ -88,7 +105,7 @@ func (receiver DecoderIMv1) readMemoryData(data []byte, dt int, size uint32) (er
 	case IMDataTypeMemory:
 		return nil, data, data[size:]
 	default:
-		return errorstack.Errorf("Type %b is not supported", dt), nil, data
+		return errors.Errorf("Type %b is not supported", dt), nil, data
 	}
 	return nil, nil, data
 }
@@ -176,7 +193,7 @@ func (receiver EncoderIMv1) encodeValueHeader(data *IMData) (error, []byte){
 				size = uint32(len(tlist))
 				tp = IMDataTypeList
 			} else {
-				return errorstack.Errorf("Type %s is not supported", reflect.ValueOf(data).Type().Kind()), nil
+				return errors.Errorf("Type %s is not supported", reflect.ValueOf(data).Type().Kind()), nil
 			}
 		}
 	}
@@ -259,7 +276,7 @@ func (receiver EncoderIMv1) encodeValueWithoutHeader(data *IMData) (error, []byt
 				}
 				b = buff.Bytes()
 			} else {
-				return errorstack.Errorf("Type %s is not supported", reflect.ValueOf(data).Type().String()), nil
+				return errors.Errorf("Type %s is not supported", reflect.ValueOf(data).Type().String()), nil
 			}
 		}
 	}

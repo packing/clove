@@ -18,12 +18,13 @@
 package connections
 
 import (
-	"nbpy/thirdpartys/errorstack"
 	"net"
 	"bytes"
 	"nbpy/codecs"
+	"nbpy/errors"
 	"nbpy/utils"
 	"nbpy/packets"
+	"nbpy/env"
 )
 
 type ReceiveAction struct {
@@ -39,37 +40,23 @@ type Connection struct {
 	OnReceive func(peer Connection, msg codecs.IMData) error
 	recvch chan ReceiveAction
 	protocol uint32
-	collectionCodecs map[uint32] *codecs.Codec
+	codec *codecs.Codec
+	packetformat *packets.PacketFormat
 }
 
-func (receiver *Connection) RegisterCodec(codec *codecs.Codec) (error) {
-	k := uint32(codec.Protocol) << 16 | uint32(codec.Version)
-	if receiver.collectionCodecs == nil {
-		receiver.collectionCodecs = make(map[uint32] *codecs.Codec)
-	}
-
-	_, ok := receiver.collectionCodecs[k]
-	if ok {
-		return errorstack.Errorf("The codec protocol %d and version %d is exists.", codec.Protocol, codec.Version)
-	}
-
-	receiver.collectionCodecs[k] = codec
-	return nil
-}
-
-func (receiver *Connection) FindCodec(protocol uint16, version uint16) (error, *codecs.Codec) {
-	k := uint32(protocol) << 16 | uint32(version)
-	if receiver.collectionCodecs == nil {
-		receiver.collectionCodecs = make(map[uint32] *codecs.Codec)
-	}
-	t, ok := receiver.collectionCodecs[k]
-	if ok {
-		return nil, t
-	}
-	return errorstack.Errorf("Codec protocol %d and version %d is not exists.", protocol, version), nil
+func (receiver *Connection) SetPacketFormat(packetformat *packets.PacketFormat) {
+	utils.LogVerbose(">>> 设定封包格式为 %s (0x%X)", packetformat.Tag, receiver.Id)
+	receiver.packetformat = packetformat
 }
 
 func (receiver *Connection) SetProtocol(tp, ver uint16) {
+	utils.LogVerbose(">>> 设定协议类型和版本为 %d(%d) (0x%X)", tp, ver, receiver.Id)
+	//寻找解码器
+	err, codec := env.FindCodec(tp, ver)
+	if err != nil {
+		return
+	}
+	receiver.codec = codec
 	receiver.protocol = uint32(tp) << 16 | uint32(ver)
 }
 
@@ -81,22 +68,56 @@ func (receiver Connection) Bye() {
 	utils.LogVerbose(">>> 关闭客户端连接 id: 0x%X addr: %s", receiver.Id, receiver.Handle.RemoteAddr().String())
 }
 
+func (receiver Connection) Process() error{
+	utils.LogVerbose(">>> 进入数据处理协程 (0x%X)", receiver.Id)
 
-func (receiver Connection) ParsePacket() error{
-	utils.LogVerbose(">>> 进入解包尝试协程 (0x%X)", receiver.Id)
+	//定义起始状态标记
+	bProcessed := false
 
 	//如果没有设定数据到达回调，则直接退出处理
 	if receiver.OnReceive == nil {
-		return errorstack.Errorf("OnReceive is not exists")
+		utils.LogWarn("此连接没有设置数据到达回调函数, 将会被强行关闭")
+		return errors.Errorf("OnReceive is not exists")
 	}
 
 	for {
 		action := <- receiver.recvch
-		parser := packets.PacketParser{Raw: action.data}
-		for {
-			err, packet := parser.Pop()
+
+		if receiver.packetformat == nil {
+			//如果没有指定封包格式，则进行封包格式选定操作
+			err, pf := env.MatchPacketFormat(action.data)
 			if err != nil {
-				if err.Error() == "Data length is not match" {
+				if err == packets.ErrorDataNotMatch {
+					//未能匹配任何封包格式，将会中断该连接
+					utils.LogWarn("该连接未能匹配到任何通信封包协议, 将会被强行关闭")
+					goto exitLabel
+				} else {
+					//可能数据不足，继续接收事件以等待数据完整
+					continue
+				}
+			}
+			utils.LogInfo("成功匹配到通信封包协议为 [%s]", pf.Tag)
+			receiver.packetformat = pf
+		}
+
+		if !bProcessed {
+			bProcessed = true
+			//如果仍处于起始状态，调用封包解包器的预处理方法
+			err, sd := receiver.packetformat.Parser.Prepare(action.data)
+			if err == nil && sd != nil {
+				//有待发送数据，直接发送
+				receiver.Handle.Write(sd)
+			}
+			if action.data.Len() == 0 {
+				//如果数据已经读完, 等待后续数据到达
+				continue
+			}
+		}
+
+		for {
+			err, packet := receiver.packetformat.Parser.Pop(action.data)
+			if err != nil {
+				if err != packets.ErrorDataNotReady {
 					utils.LogError(err.Error())
 					goto exitLabel
 				}
@@ -107,8 +128,10 @@ func (receiver Connection) ParsePacket() error{
 				break
 			}
 
-			//动态决定当前通信协议类型和版本
-			receiver.SetProtocol(packet.ProtocolType, packet.ProtocolVer)
+			if receiver.protocol == 0 {
+				//如果当前连接未确定通信协议，根据当前封包属性决定通信协议类型和版本
+				receiver.SetProtocol(packet.ProtocolType, packet.ProtocolVer)
+			}
 
 			packetData := packet.Raw
 			//如果是直接内存流数据协议，则直接转出至回调
@@ -121,15 +144,15 @@ func (receiver Connection) ParsePacket() error{
 				continue
 			}
 
-		readLabel:
-			//寻找解码器
-			err, codec := receiver.FindCodec(packet.ProtocolType, packet.ProtocolVer)
-			if err != nil {
-				return err
+			if receiver.codec == nil {
+				//如果并不是直接内存数据流，而编解码器又未能就绪，则直接中断该连接
+				utils.LogError("该连接编解码器未能就绪, 将会被强行关闭")
+				goto exitLabel
 			}
 
-			//开始使用解码器进行消息解码(单个封包可以包含多个消息体)
-			err, msg, remianData := codec.Decoder.Decode(packetData)
+		readLabel:
+			//开始使用解码器进行消息解码(单个封包允许包含多个消息体，所以此处有label供goto回流继续解码下一块消息体)
+			err, msg, remianData := receiver.codec.Decoder.Decode(packetData)
 			if err == nil {
 				err := receiver.OnReceive(receiver, msg)
 				if err != nil {
@@ -140,22 +163,28 @@ func (receiver Connection) ParsePacket() error{
 			}
 		}
 
+		//如果该接收消息带有error信息，则终止处理退出数据处理协程
 		if action.err != nil{
 			break
 		}
 	}
 
 	exitLabel:
-		utils.LogVerbose("<<< 退出解包尝试协程 (0x%X)", receiver.Id)
+		utils.LogVerbose("<<< 退出数据处理协程 (0x%X)", receiver.Id)
 	return nil
 }
 
 func (receiver Connection) Lookup(interval int) error{
-	utils.LogVerbose(">>> 进入数据通信处理协程 (0x%X)", receiver.Id)
+	utils.LogVerbose(">>> 进入通信处理协程 (0x%X)", receiver.Id)
+
+	//定义接收缓冲区
 	var recvbuffer bytes.Buffer
 
+	//创建与数据处理协程通信的channel
 	receiver.recvch = make(chan ReceiveAction)
-	go receiver.ParsePacket()
+
+	//创建数据处理协程
+	go receiver.Process()
 
 	for {
 		var b = make([]byte, 1024)
@@ -167,14 +196,15 @@ func (receiver Connection) Lookup(interval int) error{
 
 		if err != nil {
 			receiver.recvch <- ReceiveAction{err, &recvbuffer}
-			return errorstack.Errorf("Error at fd.Read.")
+			return errors.Errorf("Error at fd.Read.")
 		}
 	}
-	utils.LogVerbose("<<< 退出数据通信处理协程 (0x%X)", receiver.Id)
+	utils.LogVerbose("<<< 退出通信处理协程 (0x%X)", receiver.Id)
 	return nil
 }
 
 func (receiver Connection) Send(msgs ...codecs.IMData) (error) {
+	utils.LogVerbose(">>> 发送未编码数据 - 开始 (0x%X)", receiver.Id)
 	packet := packets.Packet{
 		Mask: 0,
 		Encrypted: false,
@@ -183,15 +213,17 @@ func (receiver Connection) Send(msgs ...codecs.IMData) (error) {
 	}
 	packet.ProtocolType = uint16(receiver.protocol >> 16)
 	packet.ProtocolVer = uint16(receiver.protocol << 16 >> 16)
-	packager := packets.PacketPackager{Pck: &packet}
+	packager := packets.PacketPackagerNBOrigin{}
+
+	var buff bytes.Buffer
 	for _, msg := range msgs {
 		err, data := codecs.EncoderIMv1{}.Encode(&msg)
 		if err == nil {
-			packager.Push(data)
+			buff.Write(data)
 		}
 	}
 
-	err, data := packager.Package()
+	err, data := packager.Package(&packet, buff.Bytes())
 	if err != nil {
 		return err
 	}
@@ -199,12 +231,15 @@ func (receiver Connection) Send(msgs ...codecs.IMData) (error) {
 	if err != nil {
 		return err
 	}
+
+	utils.LogVerbose("<<< 发送未编码数据 - 结束 (0x%X)", receiver.Id)
 	return nil
 }
 
 func (receiver Connection) SendPacket(packet packets.Packet) (error) {
-	packager := packets.PacketPackager{Pck: &packet}
-	err, data := packager.Package()
+	utils.LogVerbose(">>> 发送消息封包 - 开始 (0x%X)", receiver.Id)
+	packager := packets.PacketPackagerNBOrigin{}
+	err, data := packager.Package(&packet, packet.Raw)
 	if err != nil {
 		return err
 	}
@@ -212,5 +247,6 @@ func (receiver Connection) SendPacket(packet packets.Packet) (error) {
 	if err != nil {
 		return err
 	}
+	utils.LogVerbose("<<< 发送消息封包 - 结束 (0x%X)", receiver.Id)
 	return nil
 }
