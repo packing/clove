@@ -36,26 +36,27 @@ compress-data 			-> memory (final-packet-size - sizeof(packet-header))
 }
 */
 
+const (
+	PacketNBOriginHeaderLength = 2 + 2 + 4 + 4 + 4
+	MaskOriginCompress 			= 0x1
+	MaskOriginEncrypt 			= 0x1 << 1
+	MaskOriginImData 			= 0x1 << 2
+	MaskOriginCompressSupport	= 0x1 << 3
+	MaskOriginJson				= 0x1 << 4
+)
+
 type PacketParserNBOrigin struct {
 }
 
 type PacketPackagerNBOrigin struct {
 }
 
-func (receiver PacketParserNBOrigin) unEncrypt(in []byte) (error, []byte){
-	return nil, in
-}
-
-func (receiver PacketParserNBOrigin) unCompress(in []byte, rawlen int) (error, []byte){
-	return nil, in
-}
-
-func (receiver PacketParserNBOrigin) Prepare(*bytes.Buffer) (error, []byte) {
-	return nil, nil
+func (receiver PacketParserNBOrigin) Prepare(*bytes.Buffer) (error, byte, byte, []byte) {
+	return nil, codecs.ProtocolReserved, 0, nil
 }
 
 func (receiver PacketParserNBOrigin) TryParse(data *bytes.Buffer) (error,bool) {
-	if data.Len() < PacketHeaderLength {
+	if data.Len() < PacketNBOriginHeaderLength {
 		return ErrorDataNotReady, false
 	}
 
@@ -64,15 +65,15 @@ func (receiver PacketParserNBOrigin) TryParse(data *bytes.Buffer) (error,bool) {
 	flag := binary.LittleEndian.Uint16(sdata[2:4])
 	rlen := binary.LittleEndian.Uint32(sdata[4:8])
 	plen := binary.LittleEndian.Uint32(sdata[8:12])
-	if plen > PacketMaxLength || plen < PacketHeaderLength || plen < rlen {
+	if plen > PacketMaxLength || plen < PacketNBOriginHeaderLength || plen < rlen {
 		return ErrorDataNotMatch, false
 	}
 
-	if (flag & MaskCompress != MaskCompress) && (plen != (rlen + PacketHeaderLength)) {
+	if (flag & MaskOriginCompress != MaskOriginCompress) && (plen != (rlen + PacketNBOriginHeaderLength)) {
 		return ErrorDataNotMatch, false
 	}
 
-	if mask == 0xffff {
+	if mask != 0 {
 		return ErrorDataNotMatch, false
 	}
 
@@ -80,7 +81,7 @@ func (receiver PacketParserNBOrigin) TryParse(data *bytes.Buffer) (error,bool) {
 }
 
 func (receiver PacketParserNBOrigin) Pop(raw *bytes.Buffer) (error, *Packet) {
-	if raw.Len() < PacketHeaderLength {
+	if raw.Len() < PacketNBOriginHeaderLength {
 		return ErrorDataNotReady, nil
 	}
 
@@ -98,70 +99,56 @@ func (receiver PacketParserNBOrigin) Pop(raw *bytes.Buffer) (error, *Packet) {
 		return ErrorDataIsDamage, nil
 	}
 	packet := new(Packet)
-	packet.Mask = binary.LittleEndian.Uint16(data)
 	flag := binary.LittleEndian.Uint16(data[2:4])
-	packet.Compressed = (flag & MaskCompress) == MaskCompress
-	packet.Encrypted = (flag & MaskEncrypt) == MaskEncrypt
+	packet.Compressed = (flag & MaskOriginCompress) == MaskOriginCompress
+	packet.Encrypted = (flag & MaskOriginEncrypt) == MaskOriginEncrypt
 	switch {
-	case (flag & MaskImData) == MaskImData:
+	case (flag & MaskOriginImData) == MaskOriginImData:
 		packet.ProtocolType = codecs.ProtocolIM
-	case (flag & MaskJson) == MaskJson:
+	case (flag & MaskOriginJson) == MaskOriginJson:
 		packet.ProtocolType = codecs.ProtocolJSON
 	default:
 		packet.ProtocolType = codecs.ProtocolMemory
 	}
 	packet.ProtocolVer = 1
-	packet.CompressSupport = (flag & MaskCompressSupport) == MaskCompressSupport
+	packet.CompressSupport = (flag & MaskOriginCompressSupport) == MaskOriginCompressSupport
 
-	rdata := data[PacketHeaderLength:]
-	if packet.Compressed {
-		//todo:uncompress
-		rawlen := int(binary.LittleEndian.Uint32(data[4:8]))
-		err, rdata = receiver.unCompress(rdata, rawlen)
-	}
-	if packet.Encrypted {
-		//todo:unencrypt
-		err, rdata = receiver.unEncrypt(rdata)
-	}
-
+	rdata := data[PacketNBOriginHeaderLength:]
 	packet.Raw = rdata
 
 	return nil, packet
 }
 
 func (receiver PacketPackagerNBOrigin) Package(pck *Packet, raw []byte) (error, []byte) {
-	data := make([]byte, PacketHeaderLength)
-	binary.LittleEndian.PutUint16(data, pck.Mask)
+	data := make([]byte, PacketNBOriginHeaderLength)
+	binary.LittleEndian.PutUint16(data, 0x0)
 	var flag uint16 = 0
 
 	if pck.Compressed {
-		flag |= MaskCompress
+		flag |= MaskOriginCompress
 	}
 	if pck.CompressSupport {
-		flag |= MaskCompressSupport
+		flag |= MaskOriginCompressSupport
 	}
 	if pck.Encrypted {
-		flag |= MaskEncrypt
+		flag |= MaskOriginEncrypt
 	}
 	if pck.ProtocolType == codecs.ProtocolIM {
-		flag |= MaskImData
+		flag |= MaskOriginImData
 	}
 	if pck.ProtocolType == codecs.ProtocolJSON {
-		flag |= MaskJson
+		flag |= MaskOriginJson
 	}
 	binary.LittleEndian.PutUint16(data[2:4], flag)
 	binary.LittleEndian.PutUint32(data[4:8], uint32(len(raw)))
-	binary.LittleEndian.PutUint32(data[8:12], uint32(len(raw)) + PacketHeaderLength)
+	binary.LittleEndian.PutUint32(data[8:12], uint32(len(raw)) +PacketNBOriginHeaderLength)
+
 
 	ieee := crc32.NewIEEE()
 	ieee.Write(raw)
 	binary.LittleEndian.PutUint32(data[12:16], ieee.Sum32())
 
-	var bs bytes.Buffer
-	bs.Write(data)
-	bs.Write(raw)
-
-	return nil, bs.Bytes()
+	return nil, bytes.Join([][]byte{data, raw}, []byte(""))
 }
 
 var packetFormatNBOrigin = PacketFormat{Tag: "NBPyPacketOrigin", Priority:-999, Parser: PacketParserNBOrigin{}, Packager: PacketPackagerNBOrigin{}}

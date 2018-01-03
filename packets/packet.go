@@ -21,34 +21,25 @@ import (
 	"bytes"
 	"nbpy/errors"
 )
+const PacketMaxLength 	= 0xFFFFFF
 
-const (
-	PacketHeaderLength 	= 2 + 2 + 4 + 4 + 4
-	PacketMaxLength 	= 0x100000
-	MaskCompress 		= 0x1
-	MaskEncrypt 		= 0x1 << 1
-	MaskImData 			= 0x1 << 2
-	MaskCompressSupport	= 0x1 << 3
-	MaskJson			= 0x1 << 4
-)
 var ErrorDataNotReady 	= errors.Errorf("Data length is not enough")
 var ErrorDataNotMatch 	= errors.Errorf("Cannot match any packet format")
 var ErrorDataIsDamage 	= errors.Errorf("Data length is not match")
 var ErrorRemoteReqClose	= errors.Errorf("The remote host request close it")
 
 type Packet struct {
-	Mask uint16
 	Encrypted bool
 	Compressed bool
-	ProtocolType uint16
-	ProtocolVer uint16
+	ProtocolType byte
+	ProtocolVer byte
 	CompressSupport bool
 	Raw []byte
 }
 
 type PacketParser interface {
 	TryParse(*bytes.Buffer) (error, bool)
-	Prepare(*bytes.Buffer) (error, []byte)
+	Prepare(*bytes.Buffer) (error, byte, byte, []byte)
 	Pop(*bytes.Buffer) (error, *Packet)
 }
 

@@ -18,15 +18,19 @@
 package packets
 
 import (
-	"bytes"
-	"net/http"
-	"bufio"
-	"nbpy/utils"
-	"strings"
-	"encoding/base64"
-	"crypto/sha1"
 	"fmt"
+	"bytes"
+	"bufio"
+	"strings"
+
+	"net/http"
+	"encoding/base64"
 	"encoding/binary"
+	"crypto/sha1"
+
+	"nbpy/codecs"
+	"nbpy/bits"
+	"nbpy/utils"
 )
 
 const WSHeaderMinLength = 16
@@ -51,29 +55,53 @@ func (receiver PacketParserWS) unCompress(in []byte, rawlen int) (error, []byte)
 	return nil, in
 }
 
-func (receiver PacketParserWS) Prepare(data *bytes.Buffer) (error, []byte) {
-
+func (receiver PacketParserWS) Prepare(data *bytes.Buffer) (error, byte, byte, []byte) {
 	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(data.Bytes())))
 	if err != nil {
-		return err, nil
+		return err, codecs.ProtocolReserved, 0, nil
 	}
 
 	key := req.Header.Get("Sec-WebSocket-Key")
+	pto := req.Header.Get("Sec-WebSocket-Protocol")
 
 	//重置读缓冲区
 	data.Reset()
 
 	//在此就回发握手响应
-	//baccept := make([]byte, 64)
 	accept := key + WSMagicStr
 	hashcode := sha1.Sum([]byte(accept))
 	fk := base64.StdEncoding.EncodeToString(hashcode[:])
 	resp := fmt.Sprintf(WSRespFmt, fk)
 
-	return nil, []byte(resp)
+	var pton byte = codecs.ProtocolReserved
+	var ptov byte = 0
+
+	switch pto {
+	case "nbpyimv1":
+		pton = codecs.ProtocolIM
+		ptov = 1
+	case "nbpyimv2":
+		pton = codecs.ProtocolIM
+		ptov = 2
+	case "nbpyjson":
+		pton = codecs.ProtocolJSON
+		ptov = 1
+	case "json":
+		pton = codecs.ProtocolJSON
+		ptov = 1
+	default:
+		pton = codecs.ProtocolMemory
+		ptov = 1
+	}
+
+	return nil, pton, ptov, []byte(resp)
 }
 
 func (receiver PacketParserWS) TryParse(data *bytes.Buffer) (error,bool) {
+	fB := bits.ReadAsciiCode(data.Bytes())
+	if fB != 71 && fB != 80 {
+		return ErrorDataNotMatch, false
+	}
 	if data.Len() < WSHeaderMinLength {
 		return ErrorDataNotReady, false
 	}
@@ -179,13 +207,42 @@ func (receiver PacketParserWS) Pop(raw *bytes.Buffer) (error, *Packet) {
 		}
 	}
 
-	return nil, nil
+	pck := new(Packet)
+	pck.Raw = payloadData
+	pck.Encrypted = false
+	pck.Compressed = false
+	pck.CompressSupport = false
+
+	return nil, pck
 }
 
 func (receiver PacketPackagerWS) Package(pck *Packet, raw []byte) (error, []byte) {
-	var bs bytes.Buffer
+	rawLen := len(raw)
+	header := make([]byte, 10)
 
-	return nil, bs.Bytes()
+	if pck.ProtocolType == codecs.ProtocolJSON {
+		header[0] = byte(0x81)
+	}else{
+		header[0] = byte(0x82)
+	}
+
+	switch {
+	case rawLen <= 125:
+		header[1] = byte(rawLen)
+		header = header[:2]
+	case rawLen <= 0xFFFF:
+		header[1] = 0x7e
+		binary.BigEndian.PutUint16(header[2:4], uint16(rawLen))
+		header = header[:4]
+	default:
+		header[1] = 0x7f
+		binary.BigEndian.PutUint64(header[2:10], uint64(rawLen))
+		header = header[:10]
+	}
+
+	finalBytes := bytes.Join([][]byte{header, raw}, []byte(""))
+
+	return nil, finalBytes
 }
 
 func RegisterWebSocketOrigin(ori string) {

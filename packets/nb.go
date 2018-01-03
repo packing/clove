@@ -19,22 +19,30 @@ package packets
 
 import (
 	"encoding/binary"
-	"nbpy/errors"
-	"hash/crc32"
 	"bytes"
+	"nbpy/codecs"
+	"fmt"
 )
 
 /*
 packet struct {
-mask 					-> unsigned short (2)
-flag 					-> unsigned short (2)
-protocol-type 			-> int16 (2)
-protocol-ver 			-> int16 (2)
-final-packet-size 		-> int (4)
-verify-code 			-> unsigned long (4)
+mask 					-> bit (1)
+flag 					-> bit (7)
+protocol-type 			-> bit (4)
+protocol-ver 			-> bit (4)
+final-packet-size 		-> bit (24)
 compress-data 			-> memory (final-packet-size - sizeof(packet-header))
 }
 */
+const (
+	PacketNBHeaderLength 	= 5
+	MaskNB 					= 0x80
+	MaskNBCompressSupport 	= 0x1
+	MaskNBEncrypt 			= 0x1 << 1
+	MaskNBCompressed		= 0x1 << 2
+	MaskNBReserved			= 0x1 << 3
+	MaskNBFeature			= MaskNBReserved | MaskNB
+)
 
 type PacketParserNB struct {
 }
@@ -42,31 +50,34 @@ type PacketParserNB struct {
 type PacketPackagerNB struct {
 }
 
-func (receiver PacketParserNB) unEncrypt(in []byte) (error, []byte){
-	return nil, in
-}
-
-func (receiver PacketParserNB) unCompress(in []byte, rawlen int) (error, []byte){
-	return nil, in
-}
-
-func (receiver PacketParserNB) Prepare(*bytes.Buffer) (error, []byte) {
-	return nil, nil
+func (receiver PacketParserNB) Prepare(*bytes.Buffer) (error, byte, byte, []byte) {
+	return nil, codecs.ProtocolReserved, 0, nil
 }
 
 func (receiver PacketParserNB) TryParse(data *bytes.Buffer) (error,bool) {
-	if data.Len() < PacketHeaderLength {
+	if data.Len() < PacketNBHeaderLength {
 		return ErrorDataNotReady, false
 	}
 
-	sdata := data.Bytes()
-	mask := binary.LittleEndian.Uint16(sdata)
-	plen := binary.LittleEndian.Uint32(sdata[8:12])
-	if plen > PacketMaxLength || plen < PacketHeaderLength {
+	peekData := data.Bytes()
+	mask := peekData[0] & MaskNBFeature
+	pLen := binary.BigEndian.Uint32(peekData[1:PacketNBHeaderLength])
+	ptop := (pLen & 0xF0000000) >> 28
+	ptov := (pLen & 0xF000000) >> 24
+	pLen = pLen & PacketMaxLength
+
+	if ptop == 0 || ptov == 0 {
+		fmt.Println("1", ptop, ptov, pLen)
 		return ErrorDataNotMatch, false
 	}
 
-	if mask != 0xffff {
+	if pLen > PacketMaxLength || pLen < PacketNBHeaderLength {
+		fmt.Println("2", pLen)
+		return ErrorDataNotMatch, false
+	}
+
+	if mask != MaskNBFeature {
+		fmt.Println("3", mask)
 		return ErrorDataNotMatch, false
 	}
 
@@ -74,74 +85,70 @@ func (receiver PacketParserNB) TryParse(data *bytes.Buffer) (error,bool) {
 }
 
 func (receiver PacketParserNB) Pop(raw *bytes.Buffer) (error, *Packet) {
-	if raw.Len() < PacketHeaderLength {
+	if raw.Len() < PacketNBHeaderLength {
 		return ErrorDataNotReady, nil
 	}
 
-	packetlen := int(binary.LittleEndian.Uint32(raw.Bytes()[8:12]))
-	if packetlen > raw.Len() {
-		return ErrorDataNotReady, nil
-	}
+	peekData 	:= raw.Bytes()
+	opFlag 		:= peekData[0]
+	mask 		:= opFlag & MaskNBFeature
+	packetLen 	:= binary.BigEndian.Uint32(peekData[1:PacketNBHeaderLength])
+	ptop 		:= byte((packetLen & 0xF0000000) >> 28)
+	ptov 		:= byte((packetLen & 0xF000000) >> 24)
+	packetLen 	= packetLen & PacketMaxLength
 
-	data := make([]byte, packetlen)
-	readlen, err := raw.Read(data)
-	if err != nil {
-		return errors.Errorf("Buffer error> %s", err.Error()), nil
-	}
-	if readlen != packetlen {
+	if ptop == 0 || ptov == 0 {
 		return ErrorDataIsDamage, nil
 	}
+
+	if packetLen > PacketMaxLength || packetLen < PacketNBHeaderLength {
+		return ErrorDataIsDamage, nil
+	}
+
+	if mask != MaskNBFeature {
+		return ErrorDataIsDamage, nil
+	}
+
+	if uint(packetLen) > uint(raw.Len()) {
+		return ErrorDataNotReady, nil
+	}
+
 	packet := new(Packet)
-	packet.Mask = binary.LittleEndian.Uint16(data)
-	flag := binary.LittleEndian.Uint16(data[2:4])
-	packet.Compressed = (flag & MaskCompress) == MaskCompress
-	packet.Encrypted = (flag & MaskEncrypt) == MaskEncrypt
-	packet.ProtocolType = binary.LittleEndian.Uint16(data[4:6])
-	packet.ProtocolVer = binary.LittleEndian.Uint16(data[6:8])
-	packet.CompressSupport = (flag & MaskCompressSupport) == MaskCompressSupport
+	packet.Compressed 		= (opFlag & MaskNBCompressed) == MaskNBCompressed
+	packet.Encrypted 		= (opFlag & MaskNBEncrypt) == MaskNBEncrypt
+	packet.CompressSupport 	= (opFlag & MaskNBCompressSupport) == MaskNBCompressSupport
+	packet.ProtocolType 	= ptop
+	packet.ProtocolVer 		= ptov
+	packet.Raw 				= peekData[PacketNBHeaderLength: packetLen]
 
-	data = data[PacketHeaderLength:]
-	if packet.Compressed {
-		//todo:uncompress
-		err, data = receiver.unCompress(data, 0)
-	}
-	if packet.Encrypted {
-		//todo:unencrypt
-		err, data = receiver.unEncrypt(data)
-	}
-
-	packet.Raw = data
+	raw.Next(int(packetLen))
 
 	return nil, packet
 }
 
 func (receiver PacketPackagerNB) Package(pck *Packet, raw []byte) (error, []byte) {
-	data := make([]byte, PacketHeaderLength)
-	binary.LittleEndian.PutUint16(data, pck.Mask)
-	var flag uint16 = 0
+	header := make([]byte, PacketNBHeaderLength)
+
+	var opFlag byte = 0
 	if pck.Compressed {
-		flag |= MaskCompress
+		opFlag |= MaskNBCompressed
 	}
 	if pck.CompressSupport {
-		flag |= MaskCompressSupport
+		opFlag |= MaskNBCompressSupport
 	}
 	if pck.Encrypted {
-		flag |= MaskEncrypt
+		opFlag |= MaskNBEncrypt
 	}
-	binary.LittleEndian.PutUint16(data[2:4], flag)
-	binary.LittleEndian.PutUint16(data[4:6], pck.ProtocolType)
-	binary.LittleEndian.PutUint16(data[6:8], pck.ProtocolVer)
-	binary.LittleEndian.PutUint32(data[8:12], uint32(len(raw)) + PacketHeaderLength)
 
-	ieee := crc32.NewIEEE()
-	ieee.Write(raw)
-	binary.LittleEndian.PutUint32(data[12:16], ieee.Sum32())
+	header[0] = MaskNBFeature | opFlag
 
-	var bs bytes.Buffer
-	bs.Write(data)
-	bs.Write(raw)
+	packetLen := uint32(len(raw)) + PacketNBHeaderLength
+	ptoInfo := uint32((pck.ProtocolType << 4) | pck.ProtocolVer) << 24
+	packetLen |= ptoInfo
+	binary.BigEndian.PutUint32(header[1:], packetLen)
 
-	return nil, bs.Bytes()
+
+	return nil, bytes.Join([][]byte{header, raw}, []byte(""))
 }
 
 var packetFormatNB = PacketFormat{Tag: "NBPyPacket", Priority:-998, Parser: PacketParserNB{}, Packager: PacketPackagerNB{}}

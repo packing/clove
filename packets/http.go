@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"bufio"
 	"strings"
+	"nbpy/codecs"
+	"nbpy/bits"
 )
 
 const HttpHeaderMinLength = 16
@@ -40,11 +42,15 @@ func (receiver PacketParserHTTP) unCompress(in []byte, rawlen int) (error, []byt
 	return nil, in
 }
 
-func (receiver PacketParserHTTP) Prepare(*bytes.Buffer) (error, []byte) {
-	return nil, nil
+func (receiver PacketParserHTTP) Prepare(*bytes.Buffer) (error, byte, byte, []byte) {
+	return nil, codecs.ProtocolReserved, 0, nil
 }
 
 func (receiver PacketParserHTTP) TryParse(data *bytes.Buffer) (error,bool) {
+	fB := bits.ReadAsciiCode(data.Bytes())
+	if fB != 71 && fB != 80 {
+		return ErrorDataNotMatch, false
+	}
 	if data.Len() < HttpHeaderMinLength {
 		return ErrorDataNotReady, false
 	}

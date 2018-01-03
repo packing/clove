@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package connections
+package net
 
 import (
 	"net"
@@ -27,6 +27,11 @@ import (
 	"nbpy/env"
 )
 
+var ErrorPacketFormatNotReady = errors.Errorf("The packet format is not ready")
+var ErrorCodecNotReady = errors.Errorf("The codec is not ready")
+var ErrorDecryptFunctionNotBind = errors.Errorf("The packet is encrypted, but the decrypt function is not bind")
+var ErrorUncompressFunctionNotBind = errors.Errorf("The packet is compressed, but the uncompress function is not bind")
+
 type ReceiveAction struct {
 	err error
 	data *bytes.Buffer
@@ -35,41 +40,54 @@ type ReceiveAction struct {
 type Connection struct {
 	Handle net.Conn
 	Id int
-	Encrypt bool
-	Compress bool
-	OnReceive func(peer Connection, msg codecs.IMData) error
+	//EncryptSupport bool
+
+	OnReceive func(*Connection, codecs.IMData) error
+	OnEncrypt func(*Connection, []byte) (error, []byte)
+	OnDecrypt func(*Connection, []byte) (error, []byte)
+	OnCompress func(*Connection, []byte) (error, []byte)
+	OnUncompress func(*Connection, []byte) (error, []byte)
+
+	compressSupport bool
 	recvch chan ReceiveAction
-	protocol uint32
+	protocol byte
 	codec *codecs.Codec
 	packetformat *packets.PacketFormat
 }
 
 func (receiver *Connection) SetPacketFormat(packetformat *packets.PacketFormat) {
-	utils.LogVerbose(">>> 设定封包格式为 %s (0x%X)", packetformat.Tag, receiver.Id)
+	utils.LogInfo(">>> 设定封包格式为 %s (0x%X)", packetformat.Tag, receiver.Id)
 	receiver.packetformat = packetformat
 }
 
-func (receiver *Connection) SetProtocol(tp, ver uint16) {
-	utils.LogVerbose(">>> 设定协议类型和版本为 %d(%d) (0x%X)", tp, ver, receiver.Id)
+func (receiver *Connection) SetProtocol(tp, ver byte) {
+	utils.LogInfo(">>> 设定协议类型和版本为 %d(%d) (0x%X)", tp, ver, receiver.Id)
 	//寻找解码器
 	err, codec := env.FindCodec(tp, ver)
 	if err != nil {
 		return
 	}
+
 	receiver.codec = codec
-	receiver.protocol = uint32(tp) << 16 | uint32(ver)
+	receiver.protocol = byte((byte(tp) << 4) | byte(ver))
+}
+
+func (receiver *Connection) Close() {
+	receiver.Handle.Close()
 }
 
 func (receiver Connection) Welcome() {
-	utils.LogVerbose(">>> 建立客户端连接 id: 0x%X addr: %s", receiver.Id, receiver.Handle.RemoteAddr().String())
+	utils.LogInfo(">>> 建立连接 id: 0x%X addr: %s", receiver.Id, receiver.Handle.RemoteAddr().String())
 }
 
 func (receiver Connection) Bye() {
-	utils.LogVerbose(">>> 关闭客户端连接 id: 0x%X addr: %s", receiver.Id, receiver.Handle.RemoteAddr().String())
+	utils.LogInfo(">>> 关闭连接 id: 0x%X addr: %s", receiver.Id, receiver.Handle.RemoteAddr().String())
 }
 
-func (receiver Connection) Process() error{
+func (receiver *Connection) Process() error{
 	utils.LogVerbose(">>> 进入数据处理协程 (0x%X)", receiver.Id)
+
+	var retErr error = nil
 
 	//定义起始状态标记
 	bProcessed := false
@@ -81,7 +99,14 @@ func (receiver Connection) Process() error{
 	}
 
 	for {
-		action := <- receiver.recvch
+		action, ok := <- receiver.recvch
+		if !ok {
+			break
+		}
+
+		if action.data.Len() == 0 {
+			continue
+		}
 
 		if receiver.packetformat == nil {
 			//如果没有指定封包格式，则进行封包格式选定操作
@@ -96,17 +121,19 @@ func (receiver Connection) Process() error{
 					continue
 				}
 			}
-			utils.LogInfo("成功匹配到通信封包协议为 [%s]", pf.Tag)
 			receiver.packetformat = pf
 		}
 
 		if !bProcessed {
 			bProcessed = true
-			//如果仍处于起始状态，调用封包解包器的预处理方法
-			err, sd := receiver.packetformat.Parser.Prepare(action.data)
+			//如果仍处于起始状态，调用封包解包器的预处理方法进行某些握手操作并尝试明确协议类型(如果有需要的话，如websocket)
+			err, pto, ptov,  sd := receiver.packetformat.Parser.Prepare(action.data)
 			if err == nil && sd != nil {
 				//有待发送数据，直接发送
 				receiver.Handle.Write(sd)
+			}
+			if pto != codecs.ProtocolReserved {
+				receiver.SetProtocol(pto, ptov)
 			}
 			if action.data.Len() == 0 {
 				//如果数据已经读完, 等待后续数据到达
@@ -133,11 +160,49 @@ func (receiver Connection) Process() error{
 				receiver.SetProtocol(packet.ProtocolType, packet.ProtocolVer)
 			}
 
+			//根据对端封包标识标明对端是否支持压缩
+			if packet.CompressSupport {
+				receiver.compressSupport = packet.CompressSupport
+			}
+
 			packetData := packet.Raw
+
+			//解密处理
+			if packet.Encrypted {
+				if receiver.OnDecrypt != nil {
+					err, deEncryptData := receiver.OnDecrypt(receiver, packetData)
+					if err == nil {
+						packetData = deEncryptData
+					} else {
+						retErr = err
+						goto exitLabel
+					}
+				} else {
+					retErr = ErrorDecryptFunctionNotBind
+					goto exitLabel
+				}
+			}
+
+			if packet.Compressed {
+				if receiver.OnUncompress != nil {
+					err, rawData := receiver.OnUncompress(receiver, packetData)
+					if err == nil {
+						packetData = rawData
+					} else {
+						retErr = err
+						goto exitLabel
+					}
+				} else {
+					retErr = ErrorUncompressFunctionNotBind
+					goto exitLabel
+				}
+			}
+
 			//如果是直接内存流数据协议，则直接转出至回调
-			if packet.ProtocolType == codecs.ProtocolMemory {
+			if receiver.protocol == codecs.ProtocolMemory {
 				err := receiver.OnReceive(receiver, packetData)
 				if err != nil {
+					retErr = err
 					utils.LogError(err.Error())
 					goto exitLabel
 				}
@@ -147,6 +212,7 @@ func (receiver Connection) Process() error{
 			if receiver.codec == nil {
 				//如果并不是直接内存数据流，而编解码器又未能就绪，则直接中断该连接
 				utils.LogError("该连接编解码器未能就绪, 将会被强行关闭")
+				retErr = ErrorCodecNotReady
 				goto exitLabel
 			}
 
@@ -156,10 +222,22 @@ func (receiver Connection) Process() error{
 			if err == nil {
 				err := receiver.OnReceive(receiver, msg)
 				if err != nil {
+					utils.LogError(err.Error())
 					break
 				}
 				packetData = remianData
-				goto readLabel
+				if len(packetData) > 0{
+					goto readLabel
+				}
+			}else if err != codecs.ErrorDataNotEnough {
+				retErr = err
+				goto exitLabel
+			} else {
+				err := receiver.OnReceive(receiver, []byte(""))
+				if err != nil {
+					utils.LogError(err.Error())
+					break
+				}
 			}
 		}
 
@@ -171,10 +249,10 @@ func (receiver Connection) Process() error{
 
 	exitLabel:
 		utils.LogVerbose("<<< 退出数据处理协程 (0x%X)", receiver.Id)
-	return nil
+	return retErr
 }
 
-func (receiver Connection) Lookup(interval int) error{
+func (receiver *Connection) Lookup(interval int) error{
 	utils.LogVerbose(">>> 进入通信处理协程 (0x%X)", receiver.Id)
 
 	//定义接收缓冲区
@@ -189,6 +267,10 @@ func (receiver Connection) Lookup(interval int) error{
 	for {
 		var b = make([]byte, 1024)
 		n, err := receiver.Handle.Read(b)
+		if err != nil {
+			close(receiver.recvch)
+			return err
+		}
 		if n > 0 {
 			recvbuffer.Write(b[:n])
 			receiver.recvch <- ReceiveAction{err, &recvbuffer}
@@ -203,46 +285,66 @@ func (receiver Connection) Lookup(interval int) error{
 	return nil
 }
 
-func (receiver Connection) Send(msgs ...codecs.IMData) (error) {
+func (receiver *Connection) Send(msgs ...*codecs.IMData) (error) {
 	utils.LogVerbose(">>> 发送未编码数据 - 开始 (0x%X)", receiver.Id)
+	if receiver.packetformat == nil {
+		utils.LogWarn("!!! 发送未编码数据失败，封包解包器未就绪")
+		return ErrorPacketFormatNotReady
+	}
 	packet := packets.Packet{
-		Mask: 0,
 		Encrypted: false,
 		Compressed: false,
 		CompressSupport: false,
 	}
-	packet.ProtocolType = uint16(receiver.protocol >> 16)
-	packet.ProtocolVer = uint16(receiver.protocol << 16 >> 16)
-	packager := packets.PacketPackagerNBOrigin{}
+	packet.ProtocolType = byte(receiver.protocol >> 4)
+	packet.ProtocolVer = byte(receiver.protocol << 4 >> 4)
 
 	var buff bytes.Buffer
 	for _, msg := range msgs {
-		err, data := codecs.EncoderIMv1{}.Encode(&msg)
+		err, data := receiver.codec.Encoder.Encode(msg)
 		if err == nil {
 			buff.Write(data)
 		}
 	}
 
-	err, data := packager.Package(&packet, buff.Bytes())
-	if err != nil {
-		return err
-	}
-	_, err = receiver.Handle.Write(data)
-	if err != nil {
-		return err
-	}
+	packet.Raw = buff.Bytes()
 
+	err := receiver.SendPacket(&packet)
 	utils.LogVerbose("<<< 发送未编码数据 - 结束 (0x%X)", receiver.Id)
-	return nil
+	return err
 }
 
-func (receiver Connection) SendPacket(packet packets.Packet) (error) {
+func (receiver *Connection) SendPacket(packet *packets.Packet) (error) {
 	utils.LogVerbose(">>> 发送消息封包 - 开始 (0x%X)", receiver.Id)
-	packager := packets.PacketPackagerNBOrigin{}
-	err, data := packager.Package(&packet, packet.Raw)
+	if receiver.packetformat == nil {
+		utils.LogWarn("!!! 发送消息封包失败，封包解包器未就绪")
+		return ErrorPacketFormatNotReady
+	}
+
+	finalData := packet.Raw
+
+	if receiver.OnEncrypt != nil {
+		err, encryptData := receiver.OnEncrypt(receiver, finalData)
+		if err == nil {
+			finalData = encryptData
+			packet.Encrypted = true
+		}
+	}
+
+	if receiver.compressSupport && (receiver.OnCompress != nil) {
+		err, compressData := receiver.OnCompress(receiver, finalData)
+		if err == nil {
+			finalData = compressData
+			packet.Compressed = true
+		}
+	}
+
+	err, data := receiver.packetformat.Packager.Package(packet, finalData)
 	if err != nil {
 		return err
 	}
+
+	//utils.LogInfo(">>>", data)
 	_, err = receiver.Handle.Write(data)
 	if err != nil {
 		return err

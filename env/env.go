@@ -24,18 +24,19 @@ import (
 	"reflect"
 	"bytes"
 	"sort"
+	"nbpy/utils"
 )
 
-var collectionCodecs map[uint32] *codecs.Codec
+var collectionCodecs map[byte] *codecs.Codec
 var collectionPacketFormats []*packets.PacketFormat
 
 
 func RegisterCodec(codec *codecs.Codec) (error) {
-	k := uint32(codec.Protocol) << 16 | uint32(codec.Version)
+	k := byte((byte(codec.Protocol) << 4) | byte(codec.Version))
 	if collectionCodecs == nil {
-		collectionCodecs = make(map[uint32] *codecs.Codec)
+		collectionCodecs = make(map[byte] *codecs.Codec)
 	}
-
+	utils.LogVerbose("RegisterCodec %d[%d] KEY:%d ", codec.Protocol, codec.Version, k)
 	_, ok := collectionCodecs[k]
 	if ok {
 		return errors.Errorf("The codec protocol %d and version %d is exists.", codec.Protocol, codec.Version)
@@ -45,10 +46,10 @@ func RegisterCodec(codec *codecs.Codec) (error) {
 	return nil
 }
 
-func FindCodec(protocol uint16, version uint16) (error, *codecs.Codec) {
-	k := uint32(protocol) << 16 | uint32(version)
+func FindCodec(protocol byte, version byte) (error, *codecs.Codec) {
+	k := byte((protocol << 4) | version)
 	if collectionCodecs == nil {
-		collectionCodecs = make(map[uint32] *codecs.Codec)
+		collectionCodecs = make(map[byte] *codecs.Codec)
 	}
 	t, ok := collectionCodecs[k]
 	if ok {

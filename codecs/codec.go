@@ -17,16 +17,20 @@
 
 package codecs
 
+import (
+	"nbpy/errors"
+)
+
 const (
 	ProtocolMemory  	= 0x0
 	ProtocolIM 			= 0x1
 	ProtocolJSON 		= 0x2
-	ProtocolReserved 	= 0xFF
+	ProtocolReserved 	= 0xF
 )
 
-type IMData interface{}
-type IMMap map[IMData] IMData
-type IMSlice []IMData
+type IMData = interface{}
+type IMMap = map[IMData] IMData
+type IMSlice = []IMData
 
 type Decoder interface {
 	Decode([]byte) (error, IMData, []byte)
@@ -42,3 +46,7 @@ type Codec struct {
 	Decoder Decoder
 	Encoder Encoder
 }
+
+var ErrorDataNotEnough = errors.Errorf("The length of the head data is not enough to be decoded")
+var ErrorDataTooShort = errors.Errorf("The length of the head data is too short")
+var ErrorTypeNotSupported = errors.Errorf("Type is not supported")

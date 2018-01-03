@@ -23,6 +23,7 @@ import (
 	"math"
 	"bytes"
 	"reflect"
+	"unsafe"
 )
 
 const (
@@ -45,6 +46,22 @@ const (
 	IMDataTypeChar 		= 15
 )
 
+/*
+
+ Intermediate V1 struct
+    |header|data|
+
+    header(5 byte) =>>
+        |type|size|
+
+        type: 1 byte
+        size: 4 byte
+
+    data =>>
+        if data's type is map or list, size is elements count of data
+        otherwise, size is memory length of data
+
+*/
 type DecoderIMv1 struct {
 }
 
@@ -52,28 +69,39 @@ type EncoderIMv1 struct {
 }
 
 func (receiver DecoderIMv1) Decode(raw []byte) (error, IMData, []byte){
+	if len(raw) == 0 {
+		return ErrorDataNotEnough, nil, raw
+	}
 	if len(raw) < IMDataHeaderLength {
-		return errors.Errorf("The length of the head data is not enough to be decoded"), nil, raw
+		return ErrorDataTooShort, nil, raw
 	}
 
-	dataType := int(raw[0])
+	dataType := int8(raw[0])
+	count := binary.LittleEndian.Uint32(raw[1:5])
 	switch dataType {
 	case IMDataTypeMap:
 		return receiver.readMap(raw)
 	case IMDataTypeList:
 		return receiver.readSlice(raw)
 	default:
-		return errors.Errorf("Type %b is not supported", dataType), nil, raw
+		return receiver.readMemoryData(raw[IMDataHeaderLength:], dataType, count)
 	}
 	return nil, nil, raw
 }
 
-func (receiver DecoderIMv1) readMemoryData(data []byte, dt int, size uint32) (error, IMData, []byte)  {
+func (receiver DecoderIMv1) readMemoryData(data []byte, dt int8, size uint32) (error, IMData, []byte)  {
+	if uint(len(data)) < uint(size) {
+		return ErrorDataTooShort, nil, data
+	}
 	switch dt {
 	case IMDataTypeInt:
 		return nil, int(binary.LittleEndian.Uint32(data[:size])), data[size:]
 	case IMDataTypeInt64:
-		return nil, int64(binary.LittleEndian.Uint64(data[:size])), data[size:]
+		if unsafe.Sizeof(0x0) == 8{
+			return nil, int(binary.LittleEndian.Uint64(data[:size])), data[size:]
+		}else{
+			return nil, int64(binary.LittleEndian.Uint64(data[:size])), data[size:]
+		}
 	case IMDataTypeStr: fallthrough
 	case IMDataTypePyStr:
 		return nil, string(data[:size]), data[size:]
@@ -89,16 +117,20 @@ func (receiver DecoderIMv1) readMemoryData(data []byte, dt int, size uint32) (er
 		return receiver.readSlice(data)
 	case IMDataTypeLong:
 		if size == 8 {
-			return nil, int64(binary.LittleEndian.Uint64(data[:size])), data[size:]
+			if unsafe.Sizeof(0x0) == 8{
+				return nil, int(binary.LittleEndian.Uint64(data[:size])), data[size:]
+			}else{
+				return nil, int64(binary.LittleEndian.Uint64(data[:size])), data[size:]
+			}
 		} else if size == 4 {
 			return nil, int(binary.LittleEndian.Uint32(data[:size])), data[size:]
 		} else {
 			return errors.Errorf("The long data size %d is not valid", size), nil, data
 		}
 	case IMDataTypeShort:
-		return nil, int16(binary.LittleEndian.Uint16(data[:size])), data[size:]
+		return nil, int(binary.LittleEndian.Uint16(data[:size])), data[size:]
 	case IMDataTypeChar:
-		return nil, data[0], data[size:]
+		return nil, int(data[0]), data[size:]
 
 	case IMDataTypeBuffer: fallthrough
 	case IMDataTypePBuffer: fallthrough
@@ -116,9 +148,9 @@ func (receiver DecoderIMv1) readMap(data []byte) (error, IMMap, []byte) {
 	remain := data[5:]
 	for i := 0; i < count; i ++ {
 		itemData := remain
-		keyDataType := int(itemData[0])
+		keyDataType := int8(itemData[0])
 		keyDataSize := binary.LittleEndian.Uint32(itemData[1:5])
-		valueDataType := int(itemData[5])
+		valueDataType := int8(itemData[5])
 		valueDataSize := binary.LittleEndian.Uint32(itemData[6:10])
 
 		err, key, _ := receiver.readMemoryData(itemData[10:], keyDataType, keyDataSize)
@@ -133,13 +165,20 @@ func (receiver DecoderIMv1) readMap(data []byte) (error, IMMap, []byte) {
 }
 
 func (receiver DecoderIMv1) readSlice(data []byte) (error, IMSlice, []byte) {
-	count := int(binary.LittleEndian.Uint32(data[1:5]))
+	count := binary.LittleEndian.Uint32(data[1:5])
 	ret := make(IMSlice, count)
 	remain := data[5:]
-	for i := 0; i < count; i ++ {
+	var i uint32
+	for i = 0; i < count; i ++ {
 		itemData := remain
-		valueDataType := int(itemData[0])
+		if len(itemData) < IMDataHeaderLength {
+			return ErrorDataTooShort, ret, remain
+		}
+		valueDataType := int8(itemData[0])
 		valueDataSize := binary.LittleEndian.Uint32(itemData[1:5])
+		if uint(len(itemData)) < uint(IMDataHeaderLength + valueDataSize) {
+			return ErrorDataTooShort, ret, remain
+		}
 
 		err, val, newRemain := receiver.readMemoryData(itemData[5:], valueDataType, valueDataSize)
 		if err != nil { return err, nil, remain }
@@ -319,6 +358,399 @@ func (receiver EncoderIMv1) Encode(raw *IMData) (error, []byte){
 }
 
 
+/*
+
+ Intermediate V2 struct
+    [header]|data|
+
+	header 编码 >>
+		如果是整数数值类型而且 <= 0x7f, 没有头，第一个字节就是该元素的值, 也就是没有header, 默认数据类型为 char / int8
+		如果不是整数数值类型或者数值 > 0x7f, 第一个字节为头信息，标明了该元素的类型，其结构将如下
+
+			| | | | | | | |
+			7 6 5 4 3 2 1 0
+
+			其中，最高位 7 一定为1, 作为头信息标识位
+			位 5-6 指明本元素数据长度所在字节范围, 有如下取值:
+				[ 0 0 ](0): 表明本元素无须表明数据长度(所有数值类型)
+				[ 0 1 ](1): 表明本元素数据长度将使用后续1个字节存放(长度为 1 ~ 255，注意所有长度取值将以无符号整数为基准)
+				[ 1 0 ](2): 表明本元素数据长度将使用后续2个字节存放(长度为 256 ~ 65,535)
+				[ 1 1 ](3): 表明本元素数据长度将使用后续4个字节存放(长度为 65,536 ~ 4,294,967,295)
+
+			位 0-4 用来标识元素的数据类型, 当前版本有如下取值:
+				[ 0 0 0 0 0 ](0): 	未知数据 						(保留项，将不会被实际编码, 解码时一定不允许出现)
+				[ 0 0 0 0 1 ](1): 	char / int8 					(有符号1字节整数)
+				[ 0 0 0 1 0 ](2): 	unsigned char / uint8 			(无符号1字节整数)
+				[ 0 0 0 1 1 ](3): 	short / int16 					(有符号2字节整数)
+				[ 0 0 1 0 0 ](4): 	unsigned short / uint16 		(无符号2字节整数)
+				[ 0 0 1 0 1 ](5): 	int / int32 					(有符号4字节整数)
+				[ 0 0 1 1 0 ](6): 	unsigned int / uint32 			(无符号4字节整数)
+				[ 0 0 1 1 1 ](7): 	int64 / int64 					(有符号8字节整数)
+				[ 0 1 0 0 0 ](8): 	unsigned int64 / uint64 		(无符号8字节整数)
+				[ 0 1 0 0 1 ](9): 	float / float32 				(4字节浮点数)
+				[ 0 1 0 1 0 ](10): 	double / float64 				(8字节浮点数)
+				[ 0 1 0 1 1 ](11): 	reserved 						(无心的保留值, fk)
+				[ 0 1 1 0 0 ](12): 	bool / bool true 				(布尔值真 true)
+				[ 0 1 1 0 1 ](13): 	bool / bool false				(布尔值否 false)
+				[ 0 1 1 1 0 ](14): 	string / string					(字符串，!此类型需要标明长度)
+				[ 0 1 1 1 1 ](15): 	char[] / []byte					(二进制数据，!此类型需要标明长度)
+				[ 1 0 0 0 0 ](16): 	map / map						(字典类型数据，!此类型需要在长度字节标明元素个数)
+				[ 1 0 0 0 1 ](17): 	list / slice					(列表类型数据，!此类型需要在长度字节标明元素个数)
+
+*/
+
+const (
+	IMV2DataTypeUnknown 	= 0
+	IMV2DataTypeInt8 		= 1
+	IMV2DataTypeUint8 		= 2
+	IMV2DataTypeInt16 		= 3
+	IMV2DataTypeUint16 		= 4
+	IMV2DataTypeInt32 		= 5
+	IMV2DataTypeUint32 		= 6
+	IMV2DataTypeInt64 		= 7
+	IMV2DataTypeUint64 		= 8
+	IMV2DataTypeFloat32 	= 9
+	IMV2DataTypeFloat64 	= 10
+	IMV2DataTypeReserved 	= 11
+	IMV2DataTypeTrue 		= 12
+	IMV2DataTypeFalse 		= 13
+	IMV2DataTypeString 		= 14
+	IMV2DataTypeBytes 		= 15
+	IMV2DataTypeMap 		= 16
+	IMV2DataTypeList 		= 17
+)
+
+type DecoderIMv2 struct {
+}
+
+type EncoderIMv2 struct {
+}
+
+func calculateTypeSize(o interface{}) (uint32){
+	return uint32(reflect.TypeOf(o).Len())
+}
+
+func calculateIMV2TypeSize(imtp byte) (uint32){
+	switch imtp {
+	case IMV2DataTypeInt8: fallthrough
+	case IMV2DataTypeUint8:
+		return 1
+	case IMV2DataTypeInt16: fallthrough
+	case IMV2DataTypeUint16:
+		return 2
+	case IMV2DataTypeFloat32: fallthrough
+	case IMV2DataTypeInt32: fallthrough
+	case IMV2DataTypeUint32:
+		return 4
+	case IMV2DataTypeFloat64: fallthrough
+	case IMV2DataTypeInt64: fallthrough
+	case IMV2DataTypeUint64:
+		return 8
+	default:
+		return 0
+	}
+}
+
+func makeHeader(tp byte, lenSize byte) byte {
+	var h byte = 0x80
+	h |= tp & 0x1f
+	switch lenSize {
+	case 1:
+		h |= 0x20
+	case 2:
+		h |= 0x40
+	case 4:
+		h |= 0x60
+	}
+	return h
+}
+
+func makeHeaderAndLength(tp byte, lenData int) []byte {
+	var b = make([]byte, 5)
+	var lenSize byte = 4
+	var lenb = lenData
+	switch {
+	case lenb <= 0xff:
+		lenSize = 1
+		b[1] = byte(lenb)
+	case lenb <= 0xffff:
+		lenSize = 2
+		binary.BigEndian.PutUint16(b[1:], uint16(lenb))
+	default:
+		lenSize = 4
+		binary.BigEndian.PutUint32(b[1:], uint32(lenb))
+	}
+	b[0] = makeHeader(tp, lenSize)
+	b = b[:1 + lenSize]
+	return b
+}
+
+func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte){
+	if len(raw) == 0 {
+		return ErrorDataNotEnough, nil, raw
+	}
+	if len(raw) < 1 {
+		return ErrorDataTooShort, nil, raw
+	}
+
+	fByte := raw[0]
+	opCode := fByte >> 7
+	if opCode == 0 {
+		return nil, int(fByte), raw[1:]
+	}
+
+	elementType := fByte & 0x1f
+	realData := raw
+	lenSizeType := (fByte >> 5) & 0x3
+	var elementCount uint32 = 0
+	switch lenSizeType {
+	case 1:
+		realData = raw[2:]
+		elementCount = uint32(raw[1])
+	case 2:
+		realData = raw[3:]
+		elementCount = uint32(binary.BigEndian.Uint16(raw[1:3]))
+	case 3:
+		realData = raw[5:]
+		elementCount = binary.BigEndian.Uint32(raw[1:5])
+	default:
+		realData = raw[1:]
+		elementCount = calculateIMV2TypeSize(elementType)
+	}
+
+	if elementType != IMV2DataTypeMap && elementType != IMV2DataTypeList {
+		if uint32(len(realData)) < elementCount {
+			//如果数据长度不符合预期，可以断定非法数据
+			return ErrorDataTooShort, nil, nil
+		}
+	}
+
+	switch elementType {
+	case IMV2DataTypeInt8:
+		return nil, int(realData[0]), realData[elementCount:]
+	case IMV2DataTypeUint8:
+		return nil, uint(realData[0]), realData[elementCount:]
+	case IMV2DataTypeInt16:
+		return nil, int(binary.BigEndian.Uint16(realData)), realData[elementCount:]
+	case IMV2DataTypeUint16:
+		return nil, uint(binary.BigEndian.Uint16(realData)), realData[elementCount:]
+	case IMV2DataTypeInt32:
+		return nil, int(binary.BigEndian.Uint32(realData)), realData[elementCount:]
+	case IMV2DataTypeUint32:
+		return nil, uint(binary.BigEndian.Uint32(realData)), realData[elementCount:]
+	case IMV2DataTypeInt64:
+		if unsafe.Sizeof(0x0) == 8{
+			return nil, int(binary.BigEndian.Uint64(realData)), realData[elementCount:]
+		}else{
+			return nil, int64(binary.BigEndian.Uint64(realData)), realData[elementCount:]
+		}
+	case IMV2DataTypeUint64:
+		if unsafe.Sizeof(0x0) == 8{
+			return nil, uint(binary.BigEndian.Uint64(realData)), realData[elementCount:]
+		}else{
+			return nil, uint64(binary.BigEndian.Uint64(realData)), realData[elementCount:]
+		}
+	case IMV2DataTypeFloat32:
+		return nil, math.Float32frombits(binary.BigEndian.Uint32(realData)), realData[elementCount:]
+	case IMV2DataTypeFloat64:
+		return nil, math.Float64frombits(binary.BigEndian.Uint64(realData)), realData[elementCount:]
+	case IMV2DataTypeTrue:
+		return nil, true, realData
+	case IMV2DataTypeFalse:
+		return nil, false, realData
+	case IMV2DataTypeString:
+		e := string(realData[:elementCount])
+		return nil, e, realData[elementCount:]
+	case IMV2DataTypeBytes:
+		return nil, realData[:elementCount], realData[elementCount:]
+	case IMV2DataTypeMap:
+		var dstMap = make(IMMap, elementCount)
+		for i := 0; uint32(i) < elementCount; i ++ {
+			err, kd, remain := receiver.Decode(realData)
+			if err != nil {
+				return err, nil, nil
+			}
+			realData = remain
+			err, vd, remain := receiver.Decode(realData)
+			if err != nil {
+				return err, nil, nil
+			}
+			realData = remain
+			dstMap[kd] = vd
+		}
+		return nil, dstMap, realData
+	case IMV2DataTypeList:
+		var dstList = make(IMSlice,0)
+		for i := 0; uint32(i) < elementCount; i ++ {
+			err, vd, remain := receiver.Decode(realData)
+			if err != nil {
+				return err, nil, nil
+			}
+			realData = remain
+			dstList = append(dstList, vd)
+		}
+		return nil, dstList, realData
+	}
+	return nil, nil, raw
+}
+
+func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte){
+
+	var tpKind = reflect.ValueOf(*raw).Type().Kind()
+
+	var isInt = false
+	var isSign = false
+	var isFloat = false
+	var intValue uint64 = 0
+	switch tpKind {
+	case reflect.Int8: fallthrough
+	case reflect.Int16: fallthrough
+	case reflect.Int32: fallthrough
+	case reflect.Int64: fallthrough
+	case reflect.Int:
+		intValue = uint64(reflect.ValueOf(*raw).Int())
+		isInt = true
+		isSign = true
+	case reflect.Uint8: fallthrough
+	case reflect.Uint16: fallthrough
+	case reflect.Uint32: fallthrough
+	case reflect.Uint64: fallthrough
+	case reflect.Uint:
+		intValue = uint64(reflect.ValueOf(*raw).Uint())
+		isInt = true
+
+	case reflect.Float32:
+		isFloat = true
+		intValue = uint64(math.Float32bits((*raw).(float32)))
+	case reflect.Float64:
+		isFloat = true
+		intValue = math.Float64bits((*raw).(float64))
+	case reflect.Bool:
+		rb := make([]byte, 1)
+		if reflect.ValueOf(*raw).Bool() {
+			rb[0] = makeHeader(IMV2DataTypeTrue, 0)
+		} else {
+			rb[0] = makeHeader(IMV2DataTypeFalse, 0)
+		}
+		return nil, rb
+	default:
+	}
+
+
+	if isInt {
+		//进行压缩处理
+		rb := make([]byte, 9)
+		switch {
+		case intValue <= 0x7f:
+			rb[0] = byte(intValue)
+			return nil, rb[:1]
+		case intValue <= 0xff:
+			if isSign {
+				rb[0] = makeHeader(IMV2DataTypeInt8, 0)
+			} else {
+				rb[0] = makeHeader(IMV2DataTypeUint8, 0)
+			}
+			rb[1] = byte(intValue)
+			return nil, rb[:2]
+		case intValue <= 0xffff:
+			if isSign {
+				rb[0] = makeHeader(IMV2DataTypeInt16, 0)
+			} else {
+				rb[0] = makeHeader(IMV2DataTypeUint16, 0)
+			}
+			binary.BigEndian.PutUint16(rb[1:], uint16(intValue))
+			return nil, rb[:3]
+		case intValue <= 0xffffffff:
+			if isSign {
+				rb[0] = makeHeader(IMV2DataTypeInt32, 0)
+			} else {
+				rb[0] = makeHeader(IMV2DataTypeUint32, 0)
+			}
+			binary.BigEndian.PutUint32(rb[1:], uint32(intValue))
+			return nil, rb[:5]
+		default:
+			if isSign {
+				rb[0] = makeHeader(IMV2DataTypeInt64, 0)
+			} else {
+				rb[0] = makeHeader(IMV2DataTypeUint64, 0)
+			}
+			binary.BigEndian.PutUint64(rb[1:], intValue)
+			return nil, rb
+		}
+	}
+
+	if isFloat {
+		rb := make([]byte, 9)
+		if intValue <= 0xffffffff {
+			rb[0] = makeHeader(IMV2DataTypeFloat32, 0)
+			binary.BigEndian.PutUint32(rb[1:], uint32(intValue))
+			return nil, rb[:5]
+		} else {
+			rb[0] = makeHeader(IMV2DataTypeFloat64, 0)
+			binary.BigEndian.PutUint64(rb[1:], uint64(intValue))
+			return nil, rb[:9]
+		}
+	}
+
+	bytesRaw, isBytes := (*raw).([]byte)
+	strRaw, isStr := (*raw).(string)
+	if isBytes || isStr {
+		rbs := make([][]byte,2)
+		rbs[1] = bytesRaw
+		var etp byte = IMV2DataTypeBytes
+		if isStr {
+			etp = IMV2DataTypeString
+			rbs[1] = []byte(strRaw)
+		}
+		rbs[0] = makeHeaderAndLength(etp, len(rbs[1]))
+
+		return nil, bytes.Join(rbs, []byte(""))
+	}
+
+	mapRaw, isMap := (*raw).(IMMap)
+	if isMap {
+		var i = 0
+		var rbs = make([][]byte, len(mapRaw) + 1)
+		for k, v := range mapRaw {
+			err, rk := receiver.Encode(&k)
+			if err != nil {
+				continue
+			}
+			err, vk := receiver.Encode(&v)
+			if err != nil {
+				continue
+			}
+			rbs[i + 1] = bytes.Join([][]byte{rk,vk}, []byte(""))
+			i ++
+		}
+
+		rbs[0] = makeHeaderAndLength(IMV2DataTypeMap, i)
+
+		return nil, bytes.Join(rbs, []byte(""))
+	}
+
+	sliceRaw, isSlice := (*raw).(IMSlice)
+	if isSlice {
+		var i = 0
+		var rbs = make([][]byte, len(sliceRaw) + 1)
+		for _, v := range sliceRaw {
+			err, vk := receiver.Encode(&v)
+			if err != nil {
+				continue
+			}
+			rbs[i + 1] = vk
+			i ++
+		}
+
+		rbs[0] = makeHeaderAndLength(IMV2DataTypeList, i)
+
+		return nil, bytes.Join(rbs, []byte(""))
+	}
+	return ErrorTypeNotSupported, nil
+}
 
 var codecIMv1 = Codec{Protocol:ProtocolIM, Version:1, Decoder: DecoderIMv1{}, Encoder: EncoderIMv1{}}
 var CodecIMv1 = &codecIMv1
+
+var codecIMv2 = Codec{Protocol:ProtocolIM, Version:2, Decoder: DecoderIMv2{}, Encoder: EncoderIMv2{}}
+var CodecIMv2 = &codecIMv2
