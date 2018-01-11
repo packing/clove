@@ -20,9 +20,9 @@ package packets
 import (
 	"encoding/binary"
 	"nbpy/codecs"
-	"nbpy/errors"
 	"hash/crc32"
 	"bytes"
+	"nbpy/errors"
 )
 
 /*
@@ -51,53 +51,47 @@ type PacketParserNBOrigin struct {
 type PacketPackagerNBOrigin struct {
 }
 
-func (receiver PacketParserNBOrigin) Prepare(*bytes.Buffer) (error, byte, byte, []byte) {
-	return nil, codecs.ProtocolReserved, 0, nil
+func (receiver PacketParserNBOrigin) Prepare(in []byte) (error, int, byte, byte, []byte) {
+	return nil, 0, codecs.ProtocolReserved, 0, nil
 }
 
-func (receiver PacketParserNBOrigin) TryParse(data *bytes.Buffer) (error,bool) {
-	if data.Len() < PacketNBOriginHeaderLength {
-		return ErrorDataNotReady, false
+func (receiver PacketParserNBOrigin) TryParse(in []byte) (error,bool) {
+	if len(in) < PacketNBOriginHeaderLength {
+		return errors.ErrorDataNotReady, false
 	}
 
-	sdata := data.Bytes()
+	sdata := in
 	mask := binary.LittleEndian.Uint16(sdata)
 	flag := binary.LittleEndian.Uint16(sdata[2:4])
 	rlen := binary.LittleEndian.Uint32(sdata[4:8])
 	plen := binary.LittleEndian.Uint32(sdata[8:12])
 	if plen > PacketMaxLength || plen < PacketNBOriginHeaderLength || plen < rlen {
-		return ErrorDataNotMatch, false
+		return errors.ErrorDataNotMatch, false
 	}
 
 	if (flag & MaskOriginCompress != MaskOriginCompress) && (plen != (rlen + PacketNBOriginHeaderLength)) {
-		return ErrorDataNotMatch, false
+		return errors.ErrorDataNotMatch, false
 	}
 
 	if mask != 0 {
-		return ErrorDataNotMatch, false
+		return errors.ErrorDataNotMatch, false
 	}
 
 	return nil, true
 }
 
-func (receiver PacketParserNBOrigin) Pop(raw *bytes.Buffer) (error, *Packet) {
-	if raw.Len() < PacketNBOriginHeaderLength {
-		return ErrorDataNotReady, nil
+func (receiver PacketParserNBOrigin) Pop(in []byte) (error, *Packet, int) {
+	if len(in) < PacketNBOriginHeaderLength {
+		return errors.ErrorDataNotReady, nil, 0
 	}
 
-	packetlen := int(binary.LittleEndian.Uint32(raw.Bytes()[8:12]))
-	if packetlen > raw.Len() {
-		return ErrorDataNotReady, nil
+	packetlen := int(binary.LittleEndian.Uint32(in[8:12]))
+	if packetlen > len(in) {
+		return errors.ErrorDataNotReady, nil, 0
 	}
 
-	data := make([]byte, packetlen)
-	readlen, err := raw.Read(data)
-	if err != nil {
-		return errors.Errorf("Buffer error> %s", err.Error()), nil
-	}
-	if readlen != packetlen {
-		return ErrorDataIsDamage, nil
-	}
+	data := in[:packetlen]
+
 	packet := new(Packet)
 	flag := binary.LittleEndian.Uint16(data[2:4])
 	packet.Compressed = (flag & MaskOriginCompress) == MaskOriginCompress
@@ -116,7 +110,7 @@ func (receiver PacketParserNBOrigin) Pop(raw *bytes.Buffer) (error, *Packet) {
 	rdata := data[PacketNBOriginHeaderLength:]
 	packet.Raw = rdata
 
-	return nil, packet
+	return nil, packet, packetlen
 }
 
 func (receiver PacketPackagerNBOrigin) Package(pck *Packet, raw []byte) (error, []byte) {
@@ -151,5 +145,5 @@ func (receiver PacketPackagerNBOrigin) Package(pck *Packet, raw []byte) (error, 
 	return nil, bytes.Join([][]byte{data, raw}, []byte(""))
 }
 
-var packetFormatNBOrigin = PacketFormat{Tag: "NBPyPacketOrigin", Priority:-999, Parser: PacketParserNBOrigin{}, Packager: PacketPackagerNBOrigin{}}
+var packetFormatNBOrigin = PacketFormat{Tag: "NBPyPacketOrigin", Priority:-999, UnixNeed:true, Parser: PacketParserNBOrigin{}, Packager: PacketPackagerNBOrigin{}}
 var PacketFormatNBOrigin = &packetFormatNBOrigin

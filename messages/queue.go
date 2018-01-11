@@ -15,34 +15,28 @@
  * limitations under the License.
  */
 
-package packets
+package messages
 
-const PacketMaxLength 	= 0xFFFFFF
+import (
+	"nbpy/codecs"
+)
 
-type Packet struct {
-	Encrypted bool
-	Compressed bool
-	ProtocolType byte
-	ProtocolVer byte
-	CompressSupport bool
-	Raw []byte
+type MessageQueue chan *Message
+
+func (receiver MessageQueue) Push(data codecs.IMData) (error) {
+	msg, err := CreateMessage(data)
+	if err != nil {
+		return err
+	}
+	var ch = receiver
+	ch <- msg
+	return nil
 }
 
-type PacketParser interface {
-	TryParse([]byte) (error, bool)
-	Prepare([]byte) (error, int, byte, byte, []byte)
-	Pop([]byte) (error, *Packet, int)
-}
-
-type PacketPackager interface {
-	Package(*Packet, []byte) (error, []byte)
-}
-
-
-type PacketFormat struct {
-	Tag string
-	Priority int
-	UnixNeed bool
-	Parser PacketParser
-	Packager PacketPackager
+func (receiver MessageQueue) Pop() (*Message) {
+	msg, ok := <-receiver
+	if !ok {
+		return nil
+	}
+	return msg
 }

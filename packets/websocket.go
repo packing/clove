@@ -31,6 +31,7 @@ import (
 	"nbpy/codecs"
 	"nbpy/bits"
 	"nbpy/utils"
+	"nbpy/errors"
 )
 
 const WSHeaderMinLength = 16
@@ -47,25 +48,14 @@ type PacketParserWS struct {
 type PacketPackagerWS struct {
 }
 
-func (receiver PacketParserWS) unEncrypt(in []byte) (error, []byte){
-	return nil, in
-}
-
-func (receiver PacketParserWS) unCompress(in []byte, rawlen int) (error, []byte){
-	return nil, in
-}
-
-func (receiver PacketParserWS) Prepare(data *bytes.Buffer) (error, byte, byte, []byte) {
-	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(data.Bytes())))
+func (receiver PacketParserWS) Prepare(in []byte) (error, int, byte, byte, []byte) {
+	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(in)))
 	if err != nil {
-		return err, codecs.ProtocolReserved, 0, nil
+		return err, 0, codecs.ProtocolReserved, 0, nil
 	}
 
 	key := req.Header.Get("Sec-WebSocket-Key")
 	pto := req.Header.Get("Sec-WebSocket-Protocol")
-
-	//重置读缓冲区
-	data.Reset()
 
 	//在此就回发握手响应
 	accept := key + WSMagicStr
@@ -94,19 +84,19 @@ func (receiver PacketParserWS) Prepare(data *bytes.Buffer) (error, byte, byte, [
 		ptov = 1
 	}
 
-	return nil, pton, ptov, []byte(resp)
+	return nil, len(in), pton, ptov, []byte(resp)
 }
 
-func (receiver PacketParserWS) TryParse(data *bytes.Buffer) (error,bool) {
-	fB := bits.ReadAsciiCode(data.Bytes())
+func (receiver PacketParserWS) TryParse(in []byte) (error,bool) {
+	fB := bits.ReadAsciiCode(in)
 	if fB != 71 && fB != 80 {
-		return ErrorDataNotMatch, false
+		return errors.ErrorDataNotMatch, false
 	}
-	if data.Len() < WSHeaderMinLength {
-		return ErrorDataNotReady, false
+	if len(in) < WSHeaderMinLength {
+		return errors.ErrorDataNotReady, false
 	}
 
-	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(data.Bytes())))
+	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(in)))
 	if err != nil {
 		return err, false
 	}
@@ -117,7 +107,7 @@ func (receiver PacketParserWS) TryParse(data *bytes.Buffer) (error,bool) {
 	upg := req.Header.Get("Upgrade")
 	cnn := req.Header.Get("Connection")
 	if strings.ToLower(upg) != "websocket" || cnn != "Upgrade" || key == "" || ori == "" || ver == "" {
-		return ErrorDataNotMatch, false
+		return errors.ErrorDataNotMatch, false
 	}
 
 	if len(webSocketOrigin) > 1 {
@@ -130,24 +120,24 @@ func (receiver PacketParserWS) TryParse(data *bytes.Buffer) (error,bool) {
 		}
 		if !ballowed {
 			utils.LogWarn("请求来源 %s 不被允许", ori)
-			return ErrorDataNotMatch, false
+			return errors.ErrorDataNotMatch, false
 		}
 	}
 
 	return nil, true
 }
 
-func (receiver PacketParserWS) Pop(raw *bytes.Buffer) (error, *Packet) {
-	if raw.Len() < WSDataMinLength {
-		return ErrorDataNotReady, nil
+func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
+	if len(in) < WSDataMinLength {
+		return errors.ErrorDataNotReady, nil, 0
 	}
 
-	peekData := raw.Bytes()
+	peekData := in
 	opCode := peekData[0] & 0xF
 
 	switch opCode {
 	case 0x8:
-		return ErrorRemoteReqClose, nil
+		return errors.ErrorRemoteReqClose, nil, 0
 	default:
 
 	}
@@ -170,8 +160,8 @@ func (receiver PacketParserWS) Pop(raw *bytes.Buffer) (error, *Packet) {
 		headlen = WSDataMinLength + maskBits
 	}
 
-	if raw.Len() < headlen {
-		return ErrorDataNotReady, nil
+	if len(in) < headlen {
+		return errors.ErrorDataNotReady, nil, 0
 	}
 
 	mask := make([]byte, 4)
@@ -194,11 +184,11 @@ func (receiver PacketParserWS) Pop(raw *bytes.Buffer) (error, *Packet) {
 	}
 
 	totalLen := headlen + int(dataLen & 0xFFFFFFFF)
-	if raw.Len() < totalLen {
-		return ErrorDataNotReady, nil
+	if len(in) < totalLen {
+		return errors.ErrorDataNotReady, nil, 0
 	}
 
-	payloadData := raw.Next(totalLen)
+	payloadData := in[:totalLen]
 	payloadData = payloadData[headlen:]
 
 	if maskFlag == 1 {
@@ -213,7 +203,7 @@ func (receiver PacketParserWS) Pop(raw *bytes.Buffer) (error, *Packet) {
 	pck.Compressed = false
 	pck.CompressSupport = false
 
-	return nil, pck
+	return nil, pck, totalLen
 }
 
 func (receiver PacketPackagerWS) Package(pck *Packet, raw []byte) (error, []byte) {

@@ -21,7 +21,7 @@ import (
 	"encoding/binary"
 	"bytes"
 	"nbpy/codecs"
-	"fmt"
+	"nbpy/errors"
 )
 
 /*
@@ -50,16 +50,16 @@ type PacketParserNB struct {
 type PacketPackagerNB struct {
 }
 
-func (receiver PacketParserNB) Prepare(*bytes.Buffer) (error, byte, byte, []byte) {
-	return nil, codecs.ProtocolReserved, 0, nil
+func (receiver PacketParserNB) Prepare(in []byte) (error, int, byte, byte, []byte) {
+	return nil, 0, codecs.ProtocolReserved, 0, nil
 }
 
-func (receiver PacketParserNB) TryParse(data *bytes.Buffer) (error,bool) {
-	if data.Len() < PacketNBHeaderLength {
-		return ErrorDataNotReady, false
+func (receiver PacketParserNB) TryParse(in []byte) (error,bool) {
+	if len(in) < PacketNBHeaderLength {
+		return errors.ErrorDataNotReady, false
 	}
 
-	peekData := data.Bytes()
+	peekData := in
 	mask := peekData[0] & MaskNBFeature
 	pLen := binary.BigEndian.Uint32(peekData[1:PacketNBHeaderLength])
 	ptop := (pLen & 0xF0000000) >> 28
@@ -67,29 +67,26 @@ func (receiver PacketParserNB) TryParse(data *bytes.Buffer) (error,bool) {
 	pLen = pLen & PacketMaxLength
 
 	if ptop == 0 || ptov == 0 {
-		fmt.Println("1", ptop, ptov, pLen)
-		return ErrorDataNotMatch, false
+		return errors.ErrorDataNotMatch, false
 	}
 
 	if pLen > PacketMaxLength || pLen < PacketNBHeaderLength {
-		fmt.Println("2", pLen)
-		return ErrorDataNotMatch, false
+		return errors.ErrorDataNotMatch, false
 	}
 
 	if mask != MaskNBFeature {
-		fmt.Println("3", mask)
-		return ErrorDataNotMatch, false
+		return errors.ErrorDataNotMatch, false
 	}
 
 	return nil, true
 }
 
-func (receiver PacketParserNB) Pop(raw *bytes.Buffer) (error, *Packet) {
-	if raw.Len() < PacketNBHeaderLength {
-		return ErrorDataNotReady, nil
+func (receiver PacketParserNB) Pop(in []byte) (error, *Packet, int) {
+	if len(in) < PacketNBHeaderLength {
+		return errors.ErrorDataNotReady, nil, 0
 	}
 
-	peekData 	:= raw.Bytes()
+	peekData 	:= in
 	opFlag 		:= peekData[0]
 	mask 		:= opFlag & MaskNBFeature
 	packetLen 	:= binary.BigEndian.Uint32(peekData[1:PacketNBHeaderLength])
@@ -98,19 +95,19 @@ func (receiver PacketParserNB) Pop(raw *bytes.Buffer) (error, *Packet) {
 	packetLen 	= packetLen & PacketMaxLength
 
 	if ptop == 0 || ptov == 0 {
-		return ErrorDataIsDamage, nil
+		return errors.ErrorDataIsDamage, nil, 0
 	}
 
 	if packetLen > PacketMaxLength || packetLen < PacketNBHeaderLength {
-		return ErrorDataIsDamage, nil
+		return errors.ErrorDataIsDamage, nil, 0
 	}
 
 	if mask != MaskNBFeature {
-		return ErrorDataIsDamage, nil
+		return errors.ErrorDataIsDamage, nil, 0
 	}
 
-	if uint(packetLen) > uint(raw.Len()) {
-		return ErrorDataNotReady, nil
+	if uint(packetLen) > uint(len(in)) {
+		return errors.ErrorDataNotReady, nil, 0
 	}
 
 	packet := new(Packet)
@@ -121,9 +118,7 @@ func (receiver PacketParserNB) Pop(raw *bytes.Buffer) (error, *Packet) {
 	packet.ProtocolVer 		= ptov
 	packet.Raw 				= peekData[PacketNBHeaderLength: packetLen]
 
-	raw.Next(int(packetLen))
-
-	return nil, packet
+	return nil, packet, int(packetLen)
 }
 
 func (receiver PacketPackagerNB) Package(pck *Packet, raw []byte) (error, []byte) {

@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"reflect"
 	"unsafe"
+	"nbpy/utils"
 )
 
 const (
@@ -70,10 +71,10 @@ type EncoderIMv1 struct {
 
 func (receiver DecoderIMv1) Decode(raw []byte) (error, IMData, []byte){
 	if len(raw) == 0 {
-		return ErrorDataNotEnough, nil, raw
+		return errors.ErrorDataNotEnough, nil, raw
 	}
 	if len(raw) < IMDataHeaderLength {
-		return ErrorDataTooShort, nil, raw
+		return errors.ErrorDataTooShort, nil, raw
 	}
 
 	dataType := int8(raw[0])
@@ -91,7 +92,8 @@ func (receiver DecoderIMv1) Decode(raw []byte) (error, IMData, []byte){
 
 func (receiver DecoderIMv1) readMemoryData(data []byte, dt int8, size uint32) (error, IMData, []byte)  {
 	if uint(len(data)) < uint(size) {
-		return ErrorDataTooShort, nil, data
+		utils.LogInfo(" %d <-> %d", len(data), size)
+		return errors.ErrorDataTooShort, nil, data
 	}
 	switch dt {
 	case IMDataTypeInt:
@@ -146,7 +148,8 @@ func (receiver DecoderIMv1) readMap(data []byte) (error, IMMap, []byte) {
 	count := int(binary.LittleEndian.Uint32(data[1:5]))
 	ret := make(IMMap, count)
 	remain := data[5:]
-	for i := 0; i < count; i ++ {
+	var i = 0
+	for ; i < count; i ++ {
 		itemData := remain
 		keyDataType := int8(itemData[0])
 		keyDataSize := binary.LittleEndian.Uint32(itemData[1:5])
@@ -155,6 +158,7 @@ func (receiver DecoderIMv1) readMap(data []byte) (error, IMMap, []byte) {
 
 		err, key, _ := receiver.readMemoryData(itemData[10:], keyDataType, keyDataSize)
 		if err != nil { return err, nil, remain }
+
 		err, val, newRemain := receiver.readMemoryData(itemData[10 + keyDataSize:], valueDataType, valueDataSize)
 		if err != nil { return err, nil, remain }
 
@@ -165,19 +169,21 @@ func (receiver DecoderIMv1) readMap(data []byte) (error, IMMap, []byte) {
 }
 
 func (receiver DecoderIMv1) readSlice(data []byte) (error, IMSlice, []byte) {
-	count := binary.LittleEndian.Uint32(data[1:5])
-	ret := make(IMSlice, count)
+	count := int(binary.LittleEndian.Uint32(data[1:5]))
+	ret := make(IMSlice,count)
 	remain := data[5:]
-	var i uint32
-	for i = 0; i < count; i ++ {
+	var i = 0
+	for ; i < count; i ++{
+
 		itemData := remain
 		if len(itemData) < IMDataHeaderLength {
-			return ErrorDataTooShort, ret, remain
+			return errors.ErrorDataTooShort, ret, remain
 		}
 		valueDataType := int8(itemData[0])
 		valueDataSize := binary.LittleEndian.Uint32(itemData[1:5])
+
 		if uint(len(itemData)) < uint(IMDataHeaderLength + valueDataSize) {
-			return ErrorDataTooShort, ret, remain
+			return errors.ErrorDataTooShort, ret, remain
 		}
 
 		err, val, newRemain := receiver.readMemoryData(itemData[5:], valueDataType, valueDataSize)
@@ -189,10 +195,11 @@ func (receiver DecoderIMv1) readSlice(data []byte) (error, IMSlice, []byte) {
 	return nil, ret, remain
 }
 
-func (receiver EncoderIMv1) encodeValueHeader(data *IMData) (error, []byte){
+func (receiver EncoderIMv1) encodeValueHeader(data *IMData, datasize uint32) (error, []byte){
 	var size uint32 = 0
 	tp := IMDataTypeUnknown
-	switch reflect.ValueOf(*data).Type().Kind() {
+	kind := reflect.ValueOf(*data).Type().Kind()
+	switch kind {
 	case reflect.Int: fallthrough
 	case reflect.Uint: fallthrough
 	case reflect.Int32: fallthrough
@@ -224,12 +231,20 @@ func (receiver EncoderIMv1) encodeValueHeader(data *IMData) (error, []byte){
 	default:
 		tmap, okmap := (*data).(IMMap)
 		if okmap {
-			size = uint32(len(tmap))
+			size = datasize
+			if size == 0 {
+				size = uint32(len(tmap))
+			} else if size == 0 {
+			}
 			tp = IMDataTypeMap
 		} else {
 			tlist, oklist := (*data).(IMSlice)
 			if oklist {
-				size = uint32(len(tlist))
+				size = datasize
+				if size == 0 {
+					size = uint32(len(tlist))
+				} else if size == 0 {
+				}
 				tp = IMDataTypeList
 			} else {
 				return errors.Errorf("Type %s is not supported", reflect.ValueOf(data).Type().Kind()), nil
@@ -287,14 +302,20 @@ func (receiver EncoderIMv1) encodeValueWithoutHeader(data *IMData) (error, []byt
 		if okmap {
 			var buff bytes.Buffer
 			for k,v := range tmap {
-				err, khb := receiver.encodeValueHeader(&k)
-				if err != nil { continue }
-				err, vhb := receiver.encodeValueHeader(&v)
-				if err != nil { continue }
 				err, kb := receiver.encodeItemValue(&k)
-				if err != nil { continue }
+				if err != nil {
+					continue }
 				err, vb := receiver.encodeItemValue(&v)
-				if err != nil { continue }
+				if err != nil {
+					continue }
+				err, khb := receiver.encodeValueHeader(&k, 0)
+				if err != nil {
+					continue
+					} else {
+				}
+				err, vhb := receiver.encodeValueHeader(&v, uint32(len(vb)))
+				if err != nil {
+					continue }
 				buff.Write(khb)
 				buff.Write(vhb)
 				buff.Write(kb)
@@ -306,10 +327,12 @@ func (receiver EncoderIMv1) encodeValueWithoutHeader(data *IMData) (error, []byt
 			if oklist {
 				var buff bytes.Buffer
 				for _, v := range tlist {
-					err, vh := receiver.encodeValueHeader(&v)
-					if err != nil { continue }
-					err, vb := receiver.encodeValueWithoutHeader(&v)
-					if err != nil { continue }
+					err, vb := receiver.encodeItemValue(&v)
+					if err != nil {
+						continue }
+					err, vh := receiver.encodeValueHeader(&v, uint32(len(vb)))
+					if err != nil {
+						continue }
 					buff.Write(vh)
 					buff.Write(vb)
 				}
@@ -329,11 +352,11 @@ func (receiver EncoderIMv1) encodeItemValue(data *IMData) (error, []byte){
 	if okmap || oklist {
 		var b = make([][]byte, 2)
 		var errh error
-		errh, b[0] = receiver.encodeValueHeader(data)
+		errh, b[1] = receiver.encodeValueWithoutHeader(data)
 		if errh != nil {
 			return errh, nil
 		}
-		errh, b[1] = receiver.encodeValueWithoutHeader(data)
+		errh, b[0] = receiver.encodeValueHeader(data, 0)
 		if errh != nil {
 			return errh, nil
 		}
@@ -346,11 +369,11 @@ func (receiver EncoderIMv1) encodeItemValue(data *IMData) (error, []byte){
 func (receiver EncoderIMv1) Encode(raw *IMData) (error, []byte){
 	var b = make([][]byte, 2)
 	var errh error
-	errh, b[0] = receiver.encodeValueHeader(raw)
+	errh, b[1] = receiver.encodeValueWithoutHeader(raw)
 	if errh != nil {
 		return errh, nil
 	}
-	errh, b[1] = receiver.encodeValueWithoutHeader(raw)
+	errh, b[0] = receiver.encodeValueHeader(raw, 0)
 	if errh != nil {
 		return errh, nil
 	}
@@ -487,10 +510,10 @@ func makeHeaderAndLength(tp byte, lenData int) []byte {
 
 func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte){
 	if len(raw) == 0 {
-		return ErrorDataNotEnough, nil, raw
+		return errors.ErrorDataNotEnough, nil, raw
 	}
 	if len(raw) < 1 {
-		return ErrorDataTooShort, nil, raw
+		return errors.ErrorDataTooShort, nil, raw
 	}
 
 	fByte := raw[0]
@@ -521,7 +544,7 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte){
 	if elementType != IMV2DataTypeMap && elementType != IMV2DataTypeList {
 		if uint32(len(realData)) < elementCount {
 			//如果数据长度不符合预期，可以断定非法数据
-			return ErrorDataTooShort, nil, nil
+			return errors.ErrorDataTooShort, nil, nil
 		}
 	}
 
@@ -746,7 +769,7 @@ func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte){
 
 		return nil, bytes.Join(rbs, []byte(""))
 	}
-	return ErrorTypeNotSupported, nil
+	return errors.ErrorTypeNotSupported, nil
 }
 
 var codecIMv1 = Codec{Protocol:ProtocolIM, Version:1, Decoder: DecoderIMv1{}, Encoder: EncoderIMv1{}}

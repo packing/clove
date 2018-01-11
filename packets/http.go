@@ -18,12 +18,13 @@
 package packets
 
 import (
-	"bytes"
 	"net/http"
 	"bufio"
 	"strings"
 	"nbpy/codecs"
 	"nbpy/bits"
+	"nbpy/errors"
+	"bytes"
 )
 
 const HttpHeaderMinLength = 16
@@ -34,49 +35,40 @@ type PacketParserHTTP struct {
 type PacketPackagerHTTP struct {
 }
 
-func (receiver PacketParserHTTP) unEncrypt(in []byte) (error, []byte){
-	return nil, in
+func (receiver PacketParserHTTP) Prepare(in []byte) (error, int, byte, byte, []byte) {
+	return nil, 0, codecs.ProtocolReserved, 0, nil
 }
 
-func (receiver PacketParserHTTP) unCompress(in []byte, rawlen int) (error, []byte){
-	return nil, in
-}
-
-func (receiver PacketParserHTTP) Prepare(*bytes.Buffer) (error, byte, byte, []byte) {
-	return nil, codecs.ProtocolReserved, 0, nil
-}
-
-func (receiver PacketParserHTTP) TryParse(data *bytes.Buffer) (error,bool) {
-	fB := bits.ReadAsciiCode(data.Bytes())
+func (receiver PacketParserHTTP) TryParse(in []byte) (error,bool) {
+	fB := bits.ReadAsciiCode(in)
 	if fB != 71 && fB != 80 {
-		return ErrorDataNotMatch, false
+		return errors.ErrorDataNotMatch, false
 	}
-	if data.Len() < HttpHeaderMinLength {
-		return ErrorDataNotReady, false
+	if len(in) < HttpHeaderMinLength {
+		return errors.ErrorDataNotReady, false
 	}
-	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(data.Bytes())))
+	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(in)))
 	if err != nil {
 		return err, false
 	}
 
 	if strings.ToLower(req.Header.Get("Upgrade")) == "websocket" {
-		return ErrorDataNotMatch, false
+		return errors.ErrorDataNotMatch, false
 	}
 
 	return nil, true
 }
 
-func (receiver PacketParserHTTP) Pop(raw *bytes.Buffer) (error, *Packet) {
-	if raw.Len() < HttpHeaderMinLength {
-		return ErrorDataNotReady, nil
+func (receiver PacketParserHTTP) Pop(in []byte) (error, *Packet, int) {
+	if len(in) < HttpHeaderMinLength {
+		return errors.ErrorDataNotReady, nil, 0
 	}
-	return nil, nil
+	return nil, nil, 0
 }
 
 func (receiver PacketPackagerHTTP) Package(pck *Packet, raw []byte) (error, []byte) {
-	var bs bytes.Buffer
 
-	return nil, bs.Bytes()
+	return nil, []byte("")
 }
 
 var packetFormatHTTP = PacketFormat{Tag: "HTTP", Priority:0, Parser: PacketParserHTTP{}, Packager: PacketPackagerHTTP{}}

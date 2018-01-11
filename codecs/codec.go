@@ -41,12 +41,25 @@ type Encoder interface {
 }
 
 type Codec struct {
-	Protocol uint16
-	Version uint16
+	Protocol byte
+	Version byte
 	Decoder Decoder
 	Encoder Encoder
 }
 
-var ErrorDataNotEnough = errors.Errorf("The length of the head data is not enough to be decoded")
-var ErrorDataTooShort = errors.Errorf("The length of the head data is too short")
-var ErrorTypeNotSupported = errors.Errorf("Type is not supported")
+type DecoderMemory struct {}
+func (receiver DecoderMemory) Decode(raw []byte) (error, IMData, []byte) {
+	return nil, raw, raw[len(raw):]
+}
+
+type EncoderMemory struct {}
+func (receiver EncoderMemory) Encode(raw *IMData) (error, []byte) {
+	data, ok := (*raw).([]byte)
+	if !ok {
+		return errors.ErrorTypeNotSupported, nil
+	}
+	return nil, data
+}
+
+var codecMemoryV1 = Codec{Protocol:ProtocolMemory, Version:1, Decoder: DecoderMemory{}, Encoder: EncoderMemory{}}
+var CodecMemoryV1 = &codecMemoryV1

@@ -23,6 +23,7 @@ import (
 	"os"
 	"time"
 	"io"
+	"runtime"
 )
 
 const (
@@ -47,8 +48,8 @@ func LogInit(level int, prefix string) (error) {
 	logPrefix = prefix
 	if len(logPrefix) > 0 {
 		dt := time.Now().Format("2006-01-02")
-		for i := 0; i < 4; i++ {
-			fn := fmt.Sprintf("%s-%s-%s.log", logPrefix, LogLevelTags[i], dt)
+		//for i := 0; i < 4; i++ {
+			fn := fmt.Sprintf("%s-%s.log", logPrefix, dt)
 			_, err := os.Stat(fn)
 			if os.IsExist(err) {
 				for j := 1; j < 100; j ++ {
@@ -65,7 +66,7 @@ func LogInit(level int, prefix string) (error) {
 			if err != nil {
 				return err
 			}
-		}
+		//}
 	}
 
 	return nil
@@ -73,8 +74,8 @@ func LogInit(level int, prefix string) (error) {
 
 func getLogIO(level int) (error, io.Writer) {
 	dt := time.Now().Format("2006-01-02")
-	fn := fmt.Sprintf("%s-%s-%s.log", logPrefix, LogLevelTags[level], dt)
-	pf, err := os.OpenFile(fn, os.O_CREATE|os.O_APPEND, 0)
+	fn := fmt.Sprintf("%s-%s.log", logPrefix, dt)
+	pf, err := os.OpenFile(fn, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0)
 	if err != nil {
 		defer pf.Close()
 		return err, nil
@@ -93,7 +94,7 @@ func logAndLevel(level int, format string, v ...interface{}) {
 		if err != nil {
 			return
 		}
-		logger = log.New(iowriter, LogLevelTags[level], log.Lshortfile | log.Ltime)
+		logger = log.New(iowriter, fmt.Sprintf("[%s]", LogLevelTags[level]), log.Ltime)
 		logger.Println(s)
 	} else {
 		log.SetFlags(log.Ltime)
@@ -118,3 +119,25 @@ func LogError(format string, v ...interface{}) {
 	logAndLevel(LogLevelError, format, v...)
 }
 
+func LogPanic() {
+	if err := recover(); err != nil {
+		var st = func(all bool) string {
+			// Reserve 1K buffer at first
+			buf := make([]byte, 512)
+
+			for {
+				size := runtime.Stack(buf, all)
+				// The size of the buffer may be not enough to hold the stacktrace,
+				// so double the buffer size
+				if size == len(buf) {
+					buf = make([]byte, len(buf)<<1)
+					continue
+				}
+				break
+			}
+
+			return string(buf)
+		}
+		LogError("panic:", err ,"\nstack:" + st(false))
+	}
+}

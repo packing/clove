@@ -15,34 +15,13 @@
  * limitations under the License.
  */
 
-package packets
+package utils
 
-const PacketMaxLength 	= 0xFFFFFF
+import "fmt"
+import "C"
 
-type Packet struct {
-	Encrypted bool
-	Compressed bool
-	ProtocolType byte
-	ProtocolVer byte
-	CompressSupport bool
-	Raw []byte
+//export GoPrint
+func GoPrint(s *C.char) {
+	fmt.Println(C.GoString(s))
 }
 
-type PacketParser interface {
-	TryParse([]byte) (error, bool)
-	Prepare([]byte) (error, int, byte, byte, []byte)
-	Pop([]byte) (error, *Packet, int)
-}
-
-type PacketPackager interface {
-	Package(*Packet, []byte) (error, []byte)
-}
-
-
-type PacketFormat struct {
-	Tag string
-	Priority int
-	UnixNeed bool
-	Parser PacketParser
-	Packager PacketPackager
-}

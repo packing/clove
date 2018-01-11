@@ -22,14 +22,16 @@ import (
 	"nbpy/packets"
 	"nbpy/errors"
 	"reflect"
-	"bytes"
 	"sort"
 	"nbpy/utils"
+	"os"
+	"syscall"
+	"os/signal"
+	"fmt"
 )
 
 var collectionCodecs map[byte] *codecs.Codec
 var collectionPacketFormats []*packets.PacketFormat
-
 
 func RegisterCodec(codec *codecs.Codec) (error) {
 	k := byte((byte(codec.Protocol) << 4) | byte(codec.Version))
@@ -78,19 +80,39 @@ func RegisterPacketFormat(fmt *packets.PacketFormat) (error) {
 	return nil
 }
 
-func MatchPacketFormat(data *bytes.Buffer) (error, *packets.PacketFormat) {
+func MatchPacketFormat(data []byte) (error, *packets.PacketFormat) {
 	formats := collectionPacketFormats
 	sort.Slice(formats, func (i, j int) bool{
 		return formats[i].Priority > formats[j].Priority
 	})
 	for _, v := range formats {
 		err, b := v.Parser.TryParse(data)
-		if err == packets.ErrorDataNotReady {
+		if err == errors.ErrorDataNotReady {
 			return err, nil
 		}
 		if b {
 			return nil, v
 		}
 	}
-	return packets.ErrorDataNotMatch, nil
+	return errors.ErrorDataNotMatch, nil
+}
+
+func Schedule() {
+
+	//定时器实现
+
+	c := make(chan os.Signal, 1)
+	signals := []os.Signal{
+		//os.Interrupt,
+		//os.Kill,
+		syscall.SIGTERM,
+		syscall.SIGKILL,
+		syscall.SIGSTOP,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGQUIT,
+	}
+	signal.Notify(c, signals...)
+	s := <-c
+	fmt.Println("收到信号 > ", s)
 }

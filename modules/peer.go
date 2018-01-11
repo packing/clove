@@ -15,34 +15,43 @@
  * limitations under the License.
  */
 
-package packets
+package modules
 
-const PacketMaxLength 	= 0xFFFFFF
+import "nbpy/net"
 
-type Packet struct {
-	Encrypted bool
-	Compressed bool
-	ProtocolType byte
-	ProtocolVer byte
-	CompressSupport bool
-	Raw []byte
+const (
+	TunnelDirect 	= 1
+	TunnelUPNP		= 2
+	TunnelStun		= 4
+	TunnelAll		= TunnelDirect | TunnelUPNP | TunnelStun
+)
+
+type PeerInfo struct {
+	AddrWAN string
+	PortWAN string
+	PortLAN string
+	TunnelType int
 }
 
-type PacketParser interface {
-	TryParse([]byte) (error, bool)
-	Prepare([]byte) (error, int, byte, byte, []byte)
-	Pop([]byte) (error, *Packet, int)
+type Peer struct {
+	io *net.UDP
+	local PeerInfo
+	trustPeers []PeerInfo
+	peers map[net.SessionID] PeerInfo
 }
 
-type PacketPackager interface {
-	Package(*Packet, []byte) (error, []byte)
+func (receiver *Peer) Init() (error) {
+	return receiver.InitWithTunnelType(TunnelAll)
 }
 
+func (receiver *Peer) InitWithTunnelType(tunnels int) (error) {
+	if tunnels & TunnelDirect == TunnelDirect {
+		//尝试直接连接可能性
 
-type PacketFormat struct {
-	Tag string
-	Priority int
-	UnixNeed bool
-	Parser PacketParser
-	Packager PacketPackager
+	}
+	return nil
+}
+
+func (receiver *Peer) tryDirectConnect() (error) {
+
 }
