@@ -46,10 +46,11 @@ func createDataReadWriter(codec *codecs.Codec, format *packets.PacketFormat) (*D
 	s := new(DataReadWriter)
 	s.codec = codec
 	s.format = format
+	s.virgin = true
 	return s
 }
 
-func (receiver DataReadWriter) ReadStream(controller Controller) (error) {
+func (receiver *DataReadWriter) ReadStream(controller Controller) (error) {
 
 	var peekData []byte
 	var nPeek int
@@ -71,7 +72,6 @@ func (receiver DataReadWriter) ReadStream(controller Controller) (error) {
 	}
 
 	if receiver.virgin {
-		receiver.virgin = false
 		//如果仍处于起始状态，调用封包解包器的预处理方法进行某些握手操作并尝试明确协议类型(如果有需要的话，如websocket)
 		if peekData == nil {
 			peekData, nPeek = controller.Peek(1024)
@@ -79,23 +79,27 @@ func (receiver DataReadWriter) ReadStream(controller Controller) (error) {
 				return nil
 			}
 		}
+		receiver.virgin = false
 		err, readLen, pto, ptov,  sd := receiver.format.Parser.Prepare(peekData)
+
+		if receiver.codec == nil {
+			//寻找解码器
+			err, codec := env.FindCodec(pto, ptov)
+			if err != nil {
+				//找不到对应到解码器，将会中断该连接
+				utils.LogWarn("连接 0x%X 找不到对应解码器, 将会被强行关闭", controller.GetSessionID())
+				return err
+			}
+
+			receiver.codec = codec
+		}
+
 		if err == nil && sd != nil {
 			//有待反馈数据，发送之，并将假定此类型连接等待反馈数据方会续发数据，如websocket，所以此处直接忽略剩余数据处理
 			controller.Write(sd)
 			controller.Discard()
 			return nil
 		}
-
-		//寻找解码器
-		err, codec := env.FindCodec(pto, ptov)
-		if err != nil {
-			//找不到对应到解码器，将会中断该连接
-			utils.LogWarn("连接 0x%X 找不到对应解码器, 将会被强行关闭", controller.GetSessionID())
-			return err
-		}
-
-		receiver.codec = codec
 
 		controller.Read(readLen)
 		_, remain := controller.Peek(1)
@@ -213,14 +217,14 @@ dataCtrl:
 	return nil
 }
 
-func (receiver DataReadWriter) WriteStream(controller Controller, msgs ...codecs.IMData) ([]codecs.IMData, error) {
+func (receiver *DataReadWriter) PackStream(controller Controller, msgs ...codecs.IMData) ([]byte, []codecs.IMData, error) {
 	if receiver.format == nil {
-		utils.LogWarn("!!! 发送未编码数据失败，封包解包器未就绪")
-		return msgs, errors.ErrorPacketFormatNotReady
+		utils.LogWarn("!!! 发送未编码数据失败，连接 0x%X 封包解包器未就绪", controller.GetSessionID())
+		return []byte(""), msgs, errors.ErrorPacketFormatNotReady
 	}
 	if receiver.codec == nil {
-		utils.LogWarn("!!! 发送未编码数据失败，编解码器未就绪")
-		return msgs, errors.ErrorCodecNotReady
+		utils.LogWarn("!!! 发送未编码数据失败，连接 0x%X 封包解包器未就绪", controller.GetSessionID())
+		return []byte(""), msgs, errors.ErrorCodecNotReady
 	}
 
 	var errorMsgs []codecs.IMData = nil
@@ -264,15 +268,13 @@ func (receiver DataReadWriter) WriteStream(controller Controller, msgs ...codecs
 
 	err, data := receiver.format.Packager.Package(&packet, finalData)
 	if err != nil {
-		return msgs, err
+		return []byte(""), msgs, err
 	}
 
-	controller.Write(data)
-
-	return errorMsgs, err
+	return data, errorMsgs, err
 }
 
-func (receiver DataReadWriter) ReadDatagram(controller Controller, from string, data []byte) (error) {
+func (receiver *DataReadWriter) ReadDatagram(controller Controller, from string, data []byte) (error) {
 
 	if receiver.format != packets.PacketFormatNBOrigin && receiver.format != packets.PacketFormatNB {
 		utils.LogError("封包解包器未能就绪, 连接 0x%X 将会被强行关闭", controller.GetSessionID())
@@ -323,16 +325,16 @@ dataDecode:
 	return nil
 }
 
-func (receiver DataReadWriter) WriteDatagram(controller Controller, to string, msgs ...codecs.IMData) ([]codecs.IMData, error) {
+func (receiver *DataReadWriter) PackDatagram(controller Controller, msgs ...codecs.IMData) ([]byte, []codecs.IMData, error) {
 
 	if receiver.format != packets.PacketFormatNBOrigin && receiver.format != packets.PacketFormatNB {
 		utils.LogError("封包打包器未能就绪, 连接 0x%X 将会被强行关闭", controller.GetSessionID())
-		return msgs, errors.ErrorPacketFormatNotReady
+		return []byte(""), msgs, errors.ErrorPacketFormatNotReady
 	}
 
 	if receiver.codec != codecs.CodecIMv1 && receiver.codec != codecs.CodecIMv2 {
 		utils.LogError("编解码器未能就绪, 连接 0x%X 将会被强行关闭", controller.GetSessionID())
-		return msgs, errors.ErrorCodecNotReady
+		return []byte(""), msgs, errors.ErrorCodecNotReady
 	}
 
 	var errorMsgs []codecs.IMData = nil
@@ -362,11 +364,10 @@ func (receiver DataReadWriter) WriteDatagram(controller Controller, to string, m
 
 		err, sdata := receiver.format.Packager.Package(&packet, finalData)
 		if err != nil {
-			return msgs, err
+			return []byte(""), msgs, err
 		}
 		data = sdata
 	}
-	controller.WriteTo(to, data)
 
-	return errorMsgs, nil
+	return data, errorMsgs, nil
 }

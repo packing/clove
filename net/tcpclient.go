@@ -28,20 +28,29 @@ import (
 
 type TCPClient struct {
 	DataController
+	SocketController
 	Codec          *codecs.Codec
 	Format         *packets.PacketFormat
 	dataNotifyChan chan int
 	controller     *TCPController
+	isClosed       bool
+	associatedObject interface{}
 }
 
 func CreateTCPClient(format *packets.PacketFormat, codec *codecs.Codec) (*TCPClient) {
 	srv := new(TCPClient)
 	srv.Codec = codec
 	srv.Format = format
+	srv.isClosed = true
 	return srv
 }
 
+func (receiver *TCPClient) SetControllerAssociatedObject(o interface{}) {
+	receiver.associatedObject = o
+}
+
 func (receiver *TCPClient) Connect(addr string, port int) (error) {
+	receiver.isClosed = true
 	address := fmt.Sprintf("%s:%d", addr, port)
 	if port == 0 {
 		address = addr
@@ -56,6 +65,7 @@ func (receiver *TCPClient) Connect(addr string, port int) (error) {
 		return err
 	}
 
+	receiver.isClosed = false
 	receiver.processClient(conn)
 
 	utils.LogInfo("### 连接 %s 成功", address)
@@ -68,19 +78,32 @@ func (receiver *TCPClient) processClient(conn net.Conn) {
 	dataRW := createDataReadWriter(receiver.Codec, receiver.Format)
 	dataRW.OnDataDecoded = receiver.OnDataDecoded
 	receiver.controller = createTCPController(conn, dataRW)
+	receiver.controller.SetAssociatedObject(receiver.associatedObject)
+
+	receiver.controller.OnStop = func(controller Controller) error {
+		if receiver.OnBye != nil {
+			receiver.OnBye(controller)
+		}
+		receiver.Close()
+		return nil
+	}
 	receiver.controller.Schedule()
+
+	if receiver.OnWelcome != nil {
+		receiver.OnWelcome(receiver.controller)
+	}
 
 }
 
 func (receiver *TCPClient) Close() {
-	if receiver.controller != nil {
+	if !receiver.isClosed {
 		receiver.controller.Close()
-		receiver.controller = nil
+		receiver.isClosed = true
 	}
 }
 
 func (receiver *TCPClient) Send(data ...codecs.IMData) {
-	if receiver.controller != nil {
+	if !receiver.isClosed {
 		receiver.controller.Send(data...)
 	}
 }

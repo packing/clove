@@ -18,9 +18,22 @@
 package messages
 
 const (
+	ProtocolSchemeC2S 		= 0x01
+	ProtocolSchemeS2C 		= 0x02
+	ProtocolSchemeS2S 		= 0x03
+
+	ProtocolKeyScheme 		= 0x09
 	ProtocolKeyType 		= 0x10
 	ProtocolKeyTag 			= 0x11
-	ProtocolKeySessionId 	= 0x11
-	ProtocolKeySync 		= 0x12
-	ProtocolKeyBody 		= 0x13
+	ProtocolKeySessionId 	= 0x12
+	ProtocolKeySync 		= 0x13
+	ProtocolKeyBody 		= 0x14
+	ProtocolKeyErrorCode 	= 0x15
+	ProtocolKeySerial 		= 0x16
+
+	ProtocolTypeDeliver 	= 0x01
+	ProtocolTypeHeart 		= 0x02
+	ProtocolTypeClientLeave = 0x03
+
+	ProtocolErrorCodeOK 	= 0
 )

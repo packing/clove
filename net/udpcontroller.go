@@ -44,6 +44,7 @@ type UDPController struct {
 	DataRW        *DataReadWriter
 
 	queue         chan UDPDatagram
+	associatedObject interface{}
 }
 
 func createUDPController(ioSrc net.UDPConn, dataRW *DataReadWriter) (*UDPController) {
@@ -52,7 +53,16 @@ func createUDPController(ioSrc net.UDPConn, dataRW *DataReadWriter) (*UDPControl
 	sor.ioinner = ioSrc
 	sor.DataRW = dataRW
 	sor.id = NewSessionID()
+	sor.associatedObject = nil
 	return sor
+}
+
+func (receiver *UDPController) SetAssociatedObject(o interface{}) {
+	receiver.associatedObject = o
+}
+
+func (receiver UDPController) GetAssociatedObject() (interface{}) {
+	return receiver.associatedObject
 }
 
 func (receiver UDPController) GetSource() (string){
@@ -68,6 +78,9 @@ func (receiver UDPController) Close() {
 }
 
 func (receiver UDPController) Discard() {
+}
+
+func (receiver UDPController) CloseOnSended() {
 }
 
 func (receiver UDPController) Read(l int) ([]byte, int) {
@@ -98,7 +111,11 @@ func (receiver UDPController) WriteTo(addr string, data []byte) {
 }
 
 func (receiver UDPController) SendTo(addr string, msg ...codecs.IMData) ([]codecs.IMData, error) {
-	return receiver.DataRW.WriteDatagram(receiver, addr, msg...)
+	buf, remainMsgs, err := receiver.DataRW.PackDatagram(receiver, msg...)
+	if err == nil {
+		receiver.WriteTo(addr, buf)
+	}
+	return remainMsgs, err
 }
 
 func (receiver *UDPController) processData(group *sync.WaitGroup) {

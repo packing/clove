@@ -72,7 +72,7 @@ func LogInit(level int, prefix string) (error) {
 	return nil
 }
 
-func getLogIO(level int) (error, io.Writer) {
+func getLogIO() (error, io.Writer) {
 	dt := time.Now().Format("2006-01-02")
 	fn := fmt.Sprintf("%s-%s.log", logPrefix, dt)
 	pf, err := os.OpenFile(fn, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0)
@@ -90,7 +90,7 @@ func logAndLevel(level int, format string, v ...interface{}) {
 	s := fmt.Sprintf(format, v...)
 	var logger *log.Logger = nil
 	if len(logPrefix) > 0 {
-		err, iowriter := getLogIO(level)
+		err, iowriter := getLogIO()
 		if err != nil {
 			return
 		}

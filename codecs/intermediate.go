@@ -97,8 +97,14 @@ func (receiver DecoderIMv1) readMemoryData(data []byte, dt int8, size uint32) (e
 	}
 	switch dt {
 	case IMDataTypeInt:
+		if size != 4 {
+			return errors.ErrorDataIsDamage, nil, data
+		}
 		return nil, int(binary.LittleEndian.Uint32(data[:size])), data[size:]
 	case IMDataTypeInt64:
+		if size != 8 {
+			return errors.ErrorDataIsDamage, nil, data
+		}
 		if unsafe.Sizeof(0x0) == 8{
 			return nil, int(binary.LittleEndian.Uint64(data[:size])), data[size:]
 		}else{
@@ -106,12 +112,24 @@ func (receiver DecoderIMv1) readMemoryData(data []byte, dt int8, size uint32) (e
 		}
 	case IMDataTypeStr: fallthrough
 	case IMDataTypePyStr:
+		if size > 4096 {
+			return errors.ErrorDataIsDamage, nil, data
+		}
 		return nil, string(data[:size]), data[size:]
 	case IMDataTypeFloat:
+		if size != 4 {
+			return errors.ErrorDataIsDamage, nil, data
+		}
 		return nil, math.Float32frombits(binary.LittleEndian.Uint32(data[:size])), data[size:]
 	case IMDataTypeBool:
+		if size != 1 {
+			return errors.ErrorDataIsDamage, nil, data
+		}
 		return nil, data[0] != 0, data[size:]
 	case IMDataTypeDouble:
+		if size != 8 {
+			return errors.ErrorDataIsDamage, nil, data
+		}
 		return nil, math.Float64frombits(binary.LittleEndian.Uint64(data[:size])), data[size:]
 	case IMDataTypeMap:
 		return receiver.readMap(data)
@@ -127,16 +145,25 @@ func (receiver DecoderIMv1) readMemoryData(data []byte, dt int8, size uint32) (e
 		} else if size == 4 {
 			return nil, int(binary.LittleEndian.Uint32(data[:size])), data[size:]
 		} else {
-			return errors.Errorf("The long data size %d is not valid", size), nil, data
+			return errors.ErrorDataIsDamage, nil, data
 		}
 	case IMDataTypeShort:
+		if size != 2 {
+			return errors.ErrorDataIsDamage, nil, data
+		}
 		return nil, int(binary.LittleEndian.Uint16(data[:size])), data[size:]
 	case IMDataTypeChar:
+		if size != 1 {
+			return errors.ErrorDataIsDamage, nil, data
+		}
 		return nil, int(data[0]), data[size:]
 
 	case IMDataTypeBuffer: fallthrough
 	case IMDataTypePBuffer: fallthrough
 	case IMDataTypeMemory:
+		if size > 4096 {
+			return errors.ErrorDataIsDamage, nil, data
+		}
 		return nil, data, data[size:]
 	default:
 		return errors.Errorf("Type %b is not supported", dt), nil, data
@@ -151,10 +178,17 @@ func (receiver DecoderIMv1) readMap(data []byte) (error, IMMap, []byte) {
 	var i = 0
 	for ; i < count; i ++ {
 		itemData := remain
+		if len(itemData) < IMDataHeaderLength * 2 {
+			return errors.ErrorDataIsDamage, nil, nil
+		}
 		keyDataType := int8(itemData[0])
 		keyDataSize := binary.LittleEndian.Uint32(itemData[1:5])
 		valueDataType := int8(itemData[5])
 		valueDataSize := binary.LittleEndian.Uint32(itemData[6:10])
+
+		if len(itemData) < int(IMDataHeaderLength * 2 + keyDataSize + valueDataSize) {
+			return errors.ErrorDataIsDamage, nil, nil
+		}
 
 		err, key, _ := receiver.readMemoryData(itemData[10:], keyDataType, keyDataSize)
 		if err != nil { return err, nil, remain }
@@ -528,12 +562,21 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte){
 	var elementCount uint32 = 0
 	switch lenSizeType {
 	case 1:
+		if len(raw) < 2 {
+			return errors.ErrorDataTooShort, nil, raw
+		}
 		realData = raw[2:]
 		elementCount = uint32(raw[1])
 	case 2:
+		if len(raw) < 3 {
+			return errors.ErrorDataTooShort, nil, raw
+		}
 		realData = raw[3:]
 		elementCount = uint32(binary.BigEndian.Uint16(raw[1:3]))
 	case 3:
+		if len(raw) < 5 {
+			return errors.ErrorDataTooShort, nil, raw
+		}
 		realData = raw[5:]
 		elementCount = binary.BigEndian.Uint32(raw[1:5])
 	default:
@@ -550,20 +593,20 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte){
 
 	switch elementType {
 	case IMV2DataTypeInt8:
-		return nil, int(realData[0]), realData[elementCount:]
+		return nil, int(int8(realData[0])), realData[elementCount:]
 	case IMV2DataTypeUint8:
-		return nil, uint(realData[0]), realData[elementCount:]
+		return nil, uint(uint8(realData[0])), realData[elementCount:]
 	case IMV2DataTypeInt16:
-		return nil, int(binary.BigEndian.Uint16(realData)), realData[elementCount:]
+		return nil, int(int16(binary.BigEndian.Uint16(realData))), realData[elementCount:]
 	case IMV2DataTypeUint16:
-		return nil, uint(binary.BigEndian.Uint16(realData)), realData[elementCount:]
+		return nil, uint(uint16(binary.BigEndian.Uint16(realData))), realData[elementCount:]
 	case IMV2DataTypeInt32:
-		return nil, int(binary.BigEndian.Uint32(realData)), realData[elementCount:]
+		return nil, int(int32(binary.BigEndian.Uint32(realData))), realData[elementCount:]
 	case IMV2DataTypeUint32:
 		return nil, uint(binary.BigEndian.Uint32(realData)), realData[elementCount:]
 	case IMV2DataTypeInt64:
 		if unsafe.Sizeof(0x0) == 8{
-			return nil, int(binary.BigEndian.Uint64(realData)), realData[elementCount:]
+			return nil, int(int64(binary.BigEndian.Uint64(realData))), realData[elementCount:]
 		}else{
 			return nil, int64(binary.BigEndian.Uint64(realData)), realData[elementCount:]
 		}
@@ -571,7 +614,7 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte){
 		if unsafe.Sizeof(0x0) == 8{
 			return nil, uint(binary.BigEndian.Uint64(realData)), realData[elementCount:]
 		}else{
-			return nil, uint64(binary.BigEndian.Uint64(realData)), realData[elementCount:]
+			return nil, binary.BigEndian.Uint64(realData), realData[elementCount:]
 		}
 	case IMV2DataTypeFloat32:
 		return nil, math.Float32frombits(binary.BigEndian.Uint32(realData)), realData[elementCount:]
@@ -618,12 +661,18 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte){
 }
 
 func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte){
-
-	var tpKind = reflect.ValueOf(*raw).Type().Kind()
+	if *raw == nil {
+		return errors.ErrorTypeNotSupported, []byte("")
+	}
+	var rawValue = reflect.ValueOf(*raw)
+	var tpKind = rawValue.Type().Kind()
 
 	var isInt = false
 	var isSign = false
 	var isFloat = false
+	var isMap = false
+	var isSlice = false
+	var intRawValue int64 = 0
 	var intValue uint64 = 0
 	switch tpKind {
 	case reflect.Int8: fallthrough
@@ -631,22 +680,30 @@ func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte){
 	case reflect.Int32: fallthrough
 	case reflect.Int64: fallthrough
 	case reflect.Int:
-		intValue = uint64(reflect.ValueOf(*raw).Int())
+		intRawValue = reflect.ValueOf(*raw).Int()
+
+		intValue = uint64(intRawValue)
+		//utils.LogInfo("sign raw: %d, int %d", intRawValue, intValue)
 		isInt = true
-		isSign = true
+		isSign = intRawValue < 0
+
 	case reflect.Uint8: fallthrough
 	case reflect.Uint16: fallthrough
 	case reflect.Uint32: fallthrough
 	case reflect.Uint64: fallthrough
 	case reflect.Uint:
 		intValue = uint64(reflect.ValueOf(*raw).Uint())
+		//utils.LogInfo("unsign raw: %d, int %d", intRawValue, intValue)
 		isInt = true
+		isSign = false
 
 	case reflect.Float32:
 		isFloat = true
+		isSign = false
 		intValue = uint64(math.Float32bits((*raw).(float32)))
 	case reflect.Float64:
 		isFloat = true
+		isSign = false
 		intValue = math.Float64bits((*raw).(float64))
 	case reflect.Bool:
 		rb := make([]byte, 1)
@@ -656,6 +713,10 @@ func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte){
 			rb[0] = makeHeader(IMV2DataTypeFalse, 0)
 		}
 		return nil, rb
+	case reflect.Map:
+		isMap = true
+	case reflect.Slice:
+		isSlice = true
 	default:
 	}
 
@@ -663,42 +724,48 @@ func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte){
 	if isInt {
 		//进行压缩处理
 		rb := make([]byte, 9)
-		switch {
-		case intValue <= 0x7f:
-			rb[0] = byte(intValue)
-			return nil, rb[:1]
-		case intValue <= 0xff:
-			if isSign {
+
+		if isSign {
+			switch {
+			case intRawValue <= 127 && intRawValue >= -128:
 				rb[0] = makeHeader(IMV2DataTypeInt8, 0)
-			} else {
-				rb[0] = makeHeader(IMV2DataTypeUint8, 0)
-			}
-			rb[1] = byte(intValue)
-			return nil, rb[:2]
-		case intValue <= 0xffff:
-			if isSign {
+				rb[1] = byte(intRawValue)
+				return nil, rb[:2]
+			case intRawValue <= -129 && intRawValue >= -32768:
 				rb[0] = makeHeader(IMV2DataTypeInt16, 0)
-			} else {
-				rb[0] = makeHeader(IMV2DataTypeUint16, 0)
-			}
-			binary.BigEndian.PutUint16(rb[1:], uint16(intValue))
-			return nil, rb[:3]
-		case intValue <= 0xffffffff:
-			if isSign {
+				binary.BigEndian.PutUint16(rb[1:], uint16(int16(intRawValue)))
+				return nil, rb[:3]
+			case intRawValue < -32768 && intRawValue >= -2147483648:
 				rb[0] = makeHeader(IMV2DataTypeInt32, 0)
-			} else {
-				rb[0] = makeHeader(IMV2DataTypeUint32, 0)
-			}
-			binary.BigEndian.PutUint32(rb[1:], uint32(intValue))
-			return nil, rb[:5]
-		default:
-			if isSign {
+				binary.BigEndian.PutUint32(rb[1:], uint32(int32(intRawValue)))
+				return nil, rb[:5]
+			default:
 				rb[0] = makeHeader(IMV2DataTypeInt64, 0)
-			} else {
-				rb[0] = makeHeader(IMV2DataTypeUint64, 0)
+				binary.BigEndian.PutUint64(rb[1:], uint64(intRawValue))
+				return nil, rb
 			}
-			binary.BigEndian.PutUint64(rb[1:], intValue)
-			return nil, rb
+		} else {
+			switch {
+			case intValue <= 0x7f:
+				rb[0] = byte(intValue)
+				return nil, rb[:1]
+			case intValue <= 0xff:
+				rb[0] = makeHeader(IMV2DataTypeUint8, 0)
+				rb[1] = byte(intValue)
+				return nil, rb[:2]
+			case intValue <= 0xffff:
+				rb[0] = makeHeader(IMV2DataTypeUint16, 0)
+				binary.BigEndian.PutUint16(rb[1:], uint16(intValue))
+				return nil, rb[:3]
+			case intValue <= 0xffffffff:
+				rb[0] = makeHeader(IMV2DataTypeUint32, 0)
+				binary.BigEndian.PutUint32(rb[1:], uint32(intValue))
+				return nil, rb[:5]
+			default:
+				rb[0] = makeHeader(IMV2DataTypeUint64, 0)
+				binary.BigEndian.PutUint64(rb[1:], intValue)
+				return nil, rb
+			}
 		}
 	}
 
@@ -730,16 +797,22 @@ func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte){
 		return nil, bytes.Join(rbs, []byte(""))
 	}
 
-	mapRaw, isMap := (*raw).(IMMap)
+	//mapRaw, isMap := (*raw).(IMMap)
+	isMap = tpKind == reflect.Map
 	if isMap {
 		var i = 0
-		var rbs = make([][]byte, len(mapRaw) + 1)
-		for k, v := range mapRaw {
-			err, rk := receiver.Encode(&k)
+		var rbs = make([][]byte, rawValue.Len() + 1)
+		var ks = rawValue.MapKeys()
+		for ki := range ks {
+			var k = ks[ki]
+			var v = rawValue.MapIndex(k)
+			var ik = k.Interface()
+			err, rk := receiver.Encode(&ik)
 			if err != nil {
 				continue
 			}
-			err, vk := receiver.Encode(&v)
+			var iv = v.Interface()
+			err, vk := receiver.Encode(&iv)
 			if err != nil {
 				continue
 			}
@@ -769,7 +842,91 @@ func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte){
 
 		return nil, bytes.Join(rbs, []byte(""))
 	}
+
 	return errors.ErrorTypeNotSupported, nil
+}
+
+
+type IntermediateValue struct {
+	raw interface{}
+}
+
+func CreateIntermediateValue(raw interface{}) (*IntermediateValue) {
+	v := new(IntermediateValue)
+	v.raw = raw
+	return v
+}
+
+func (receiver IntermediateValue) String() (string) {
+	s, ok := receiver.raw.(string)
+	if !ok {
+		return ""
+	}
+	return s
+}
+
+func (receiver IntermediateValue) Int() (int) {
+	return receiver.IntWithDefault(0)
+}
+
+func (receiver IntermediateValue) Int64() (int64) {
+	return receiver.Int64WithDefault(0)
+}
+
+func (receiver IntermediateValue) IntWithDefault(def int) (int) {
+	s, ok := receiver.raw.(int)
+	if !ok {
+		return def
+	}
+	return s
+}
+
+func (receiver IntermediateValue) Int64WithDefault(def int64) (int64) {
+	s, ok := receiver.raw.(int64)
+	if !ok {
+		return def
+	}
+	return s
+}
+
+func (receiver IntermediateValue) Bool() (bool) {
+	s, ok := receiver.raw.(bool)
+	if !ok {
+		return false
+	}
+	return s
+}
+
+func (receiver IntermediateValue) Float32() (float32) {
+	s, ok := receiver.raw.(float32)
+	if !ok {
+		return 0
+	}
+	return s
+}
+
+func (receiver IntermediateValue) Float64() (float64) {
+	s, ok := receiver.raw.(float64)
+	if !ok {
+		return 0
+	}
+	return s
+}
+
+func (receiver IntermediateValue) Map() (map[interface{}] interface{}) {
+	s, ok := receiver.raw.(map[interface{}] interface{})
+	if !ok {
+		return make(map[interface{}] interface{})
+	}
+	return s
+}
+
+func (receiver IntermediateValue) Slice() ([] interface{}) {
+	s, ok := receiver.raw.([] interface{})
+	if !ok {
+		return make([] interface{}, 0)
+	}
+	return s
 }
 
 var codecIMv1 = Codec{Protocol:ProtocolIM, Version:1, Decoder: DecoderIMv1{}, Encoder: EncoderIMv1{}}

@@ -25,7 +25,7 @@ import (
 	"nbpy/codecs"
 	"nbpy/packets"
 	"nbpy/errors"
-	"sync"
+	"nbpy/containers"
 )
 
 /*
@@ -42,9 +42,8 @@ type TCPServer struct {
 	limit          int
 	total          int
 	listener       *net.TCPListener
-	dataNotifyChan chan int
-	controllers    map[SessionID] *TCPController
-	mutex          sync.Mutex
+	controllers    containers.SyncDict
+	isClosed       bool
 }
 
 func CreateTCPServer() (*TCPServer) {
@@ -55,10 +54,12 @@ func CreateTCPServer() (*TCPServer) {
 func CreateTCPServerWithLimit(limit int) (*TCPServer) {
 	srv := CreateTCPServer()
 	srv.limit = limit
+	srv.isClosed = true
 	return srv
 }
 
 func (receiver *TCPServer) Bind(addr string, port int) (error) {
+	receiver.isClosed = true
 	address := fmt.Sprintf("%s:%d", addr, port)
 	if port == 0 {
 		address = addr
@@ -73,9 +74,8 @@ func (receiver *TCPServer) Bind(addr string, port int) (error) {
 		return err
 	}
 
-	//初始化所有channel
-	receiver.dataNotifyChan = make(chan int)
-	receiver.controllers = make(map[SessionID] *TCPController)
+	receiver.isClosed = false
+	receiver.controllers = containers.NewSync()
 
 	utils.LogInfo("### 监听 %s 成功", address)
 
@@ -83,15 +83,23 @@ func (receiver *TCPServer) Bind(addr string, port int) (error) {
 }
 
 func (receiver *TCPServer) addController(controller *TCPController) {
-	receiver.mutex.Lock()
-	defer receiver.mutex.Unlock()
-	receiver.controllers[controller.GetSessionID()] = controller
+	receiver.controllers.Set(controller.GetSessionID(),controller)
 }
 
 func (receiver *TCPServer) delController(controller Controller) {
-	receiver.mutex.Lock()
-	defer receiver.mutex.Unlock()
-	delete(receiver.controllers, controller.GetSessionID())
+	receiver.controllers.Pop(controller.GetSessionID())
+}
+
+func (receiver *TCPServer) getController(sessid SessionID) Controller {
+	v := receiver.controllers.Get(sessid)
+	if v == nil {
+		return nil
+	}
+	ctrl, ok := v.(Controller)
+	if ok {
+		return ctrl
+	}
+	return nil
 }
 
 func (receiver *TCPServer) processClient(conn net.Conn) {
@@ -113,10 +121,6 @@ func (receiver *TCPServer) processClient(conn net.Conn) {
 		receiver.delController(controller)
 		return nil
 	}
-	go func() {
-		<- receiver.dataNotifyChan
-		controller.Close()
-	}()
 
 	receiver.addController(controller)
 
@@ -143,20 +147,39 @@ func (receiver *TCPServer) goroutineAccept() {
 
 		receiver.processClient(conn)
 	}
+	utils.LogError("=== 新连接接收器已关闭")
 }
 
 func (receiver *TCPServer) Close() {
-	receiver.listener.Close()
-	close(receiver.dataNotifyChan)
+	if !receiver.isClosed {
+		receiver.listener.Close()
+		receiver.closeAllController()
+		receiver.isClosed = true
+	}
 }
 
 func (receiver *TCPServer) Schedule() {
 	go receiver.goroutineAccept()
 }
 
+func (receiver *TCPServer) closeAllController(msg ...codecs.IMData) {
+	if receiver.isClosed {
+		return
+	}
+	for _, v := range receiver.controllers.Items() {
+		if v.Value == nil {
+			continue
+		}
+		controller, ok := v.Value.(Controller)
+		if ok {
+			controller.Close()
+		}
+	}
+}
+
 func (receiver *TCPServer) CloseController(sessionid SessionID) (error) {
-	processor, ok := receiver.controllers[sessionid]
-	if !ok {
+	processor := receiver.getController(sessionid)
+	if processor == nil {
 		return errors.ErrorSessionIsNotExists
 	}
 	processor.Close()
@@ -165,25 +188,40 @@ func (receiver *TCPServer) CloseController(sessionid SessionID) (error) {
 
 
 func (receiver *TCPServer) Send(sessionid SessionID,msg ...codecs.IMData) ([]codecs.IMData, error) {
-	processor, ok := receiver.controllers[sessionid]
-	if !ok {
+	if receiver.isClosed {
+		return msg, errors.ErrorSessionIsNotExists
+	}
+	processor := receiver.getController(sessionid)
+	if processor == nil {
 		return msg, errors.ErrorSessionIsNotExists
 	}
 	return processor.Send(msg...)
 }
 
 func (receiver *TCPServer) Mutilcast(sessionids []SessionID,msg ...codecs.IMData) {
+	if receiver.isClosed {
+		return
+	}
 	for _, sessionid := range sessionids {
-		processor, ok := receiver.controllers[sessionid]
-		if !ok {
+		controller := receiver.getController(sessionid)
+		if controller == nil {
 			continue
 		}
-		processor.Send(msg...)
+		controller.Send(msg...)
 	}
 }
 
 func (receiver *TCPServer) Boardcast(msg ...codecs.IMData) {
-	for _, controller := range receiver.controllers {
-		controller.Send(msg...)
+	if receiver.isClosed {
+		return
+	}
+	for v := range receiver.controllers.IterItems() {
+		if v.Value == nil {
+			continue
+		}
+		controller, ok := v.Value.(Controller)
+		if ok {
+			controller.Send(msg...)
+		}
 	}
 }

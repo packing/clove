@@ -64,7 +64,7 @@ func UnMaskBytes(raw []byte, bitSize byte) (byte, []byte) {
 	return maskSrc, srcb
 }
 
-func ReadAsciiCode(raw []byte) (byte) {
+func ReadAsciiCode(raw []byte) byte {
 	if len(raw) == 0 {
 		return 0
 	}

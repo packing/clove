@@ -37,7 +37,7 @@ import (
 const WSHeaderMinLength = 16
 const WSDataMinLength = 2
 const WSMagicStr = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-const WSRespFmt = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n"
+const WSRespFmt = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\nSec-WebSocket-Protocol: %s\r\n\r\n"
 
 
 var webSocketOrigin = []string{""}
@@ -49,10 +49,12 @@ type PacketPackagerWS struct {
 }
 
 func (receiver PacketParserWS) Prepare(in []byte) (error, int, byte, byte, []byte) {
+	//utils.LogInfo(">>> HTTPHEADER > %s", string(in))
 	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(in)))
 	if err != nil {
 		return err, 0, codecs.ProtocolReserved, 0, nil
 	}
+
 
 	key := req.Header.Get("Sec-WebSocket-Key")
 	pto := req.Header.Get("Sec-WebSocket-Protocol")
@@ -61,7 +63,7 @@ func (receiver PacketParserWS) Prepare(in []byte) (error, int, byte, byte, []byt
 	accept := key + WSMagicStr
 	hashcode := sha1.Sum([]byte(accept))
 	fk := base64.StdEncoding.EncodeToString(hashcode[:])
-	resp := fmt.Sprintf(WSRespFmt, fk)
+	resp := fmt.Sprintf(WSRespFmt, fk, pto)
 
 	var pton byte = codecs.ProtocolReserved
 	var ptov byte = 0
@@ -70,19 +72,26 @@ func (receiver PacketParserWS) Prepare(in []byte) (error, int, byte, byte, []byt
 	case "nbpyimv1":
 		pton = codecs.ProtocolIM
 		ptov = 1
+		utils.LogInfo(">>> 该连接数据协议为 Intermediate V1")
 	case "nbpyimv2":
 		pton = codecs.ProtocolIM
 		ptov = 2
+		utils.LogInfo(">>> 该连接数据协议为 Intermediate V2")
 	case "nbpyjson":
 		pton = codecs.ProtocolJSON
 		ptov = 1
+		utils.LogInfo(">>> 该连接数据协议为 JSON V1")
 	case "json":
 		pton = codecs.ProtocolJSON
 		ptov = 1
+		utils.LogInfo(">>> 该连接数据协议为 JSON V1")
 	default:
 		pton = codecs.ProtocolMemory
 		ptov = 1
+		utils.LogInfo(">>> 该连接数据协议为 TEXT V1")
 	}
+
+	utils.LogInfo(">>> 收到Websocket升级请求，允许升级连接")
 
 	return nil, len(in), pton, ptov, []byte(resp)
 }

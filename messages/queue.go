@@ -19,17 +19,20 @@ package messages
 
 import (
 	"nbpy/codecs"
+	"nbpy/net"
 )
 
 type MessageQueue chan *Message
 
-func (receiver MessageQueue) Push(data codecs.IMData) (error) {
-	msg, err := CreateMessage(data)
+func (receiver MessageQueue) Push(controller net.Controller, addr string, data codecs.IMData) (error) {
+	msg, err := MessageFromData(controller, addr, data)
 	if err != nil {
 		return err
 	}
 	var ch = receiver
-	ch <- msg
+	go func() {
+		ch <- msg
+		}()
 	return nil
 }
 
@@ -40,3 +43,5 @@ func (receiver MessageQueue) Pop() (*Message) {
 	}
 	return msg
 }
+
+var GlobalMessageQueue = make(MessageQueue, 102400)

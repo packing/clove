@@ -38,10 +38,10 @@ func RegisterCodec(codec *codecs.Codec) (error) {
 	if collectionCodecs == nil {
 		collectionCodecs = make(map[byte] *codecs.Codec)
 	}
-	utils.LogVerbose("RegisterCodec %d[%d] KEY:%d ", codec.Protocol, codec.Version, k)
+	utils.LogVerbose(">>> 注册编解码器 封包协议[%d] 版本[%d]", codec.Protocol, codec.Version)
 	_, ok := collectionCodecs[k]
 	if ok {
-		return errors.Errorf("The codec protocol %d and version %d is exists.", codec.Protocol, codec.Version)
+		return errors.Errorf("!!! 封包协议[%d] 版本[%d] 已经注册，无需重复注册", codec.Protocol, codec.Version)
 	}
 
 	collectionCodecs[k] = codec
@@ -57,10 +57,10 @@ func FindCodec(protocol byte, version byte) (error, *codecs.Codec) {
 	if ok {
 		return nil, t
 	}
-	return errors.Errorf("Codec protocol %d and version %d is not exists.", protocol, version), nil
+	return errors.Errorf("!!! 封包协议[%d] 版本[%d] 不存在", protocol, version), nil
 }
 
-func RegisterPacketFormat(fmt *packets.PacketFormat) (error) {
+func RegisterPacketFormat(fmt *packets.PacketFormat) error {
 	if collectionPacketFormats == nil {
 		collectionPacketFormats = make([]*packets.PacketFormat, 0)
 	}
@@ -73,7 +73,7 @@ func RegisterPacketFormat(fmt *packets.PacketFormat) (error) {
 		}
 	}
 	if ok {
-		return errors.Errorf("The packetformat %s is exists.", reflect.TypeOf(*fmt).Kind())
+		return errors.Errorf("!!! 指定的封包格式 %s 不存在", reflect.TypeOf(*fmt).Kind())
 	}
 
 	collectionPacketFormats = append(collectionPacketFormats, fmt)
@@ -103,8 +103,8 @@ func Schedule() {
 
 	c := make(chan os.Signal, 1)
 	signals := []os.Signal{
-		//os.Interrupt,
-		//os.Kill,
+		os.Interrupt,
+		os.Kill,
 		syscall.SIGTERM,
 		syscall.SIGKILL,
 		syscall.SIGSTOP,
@@ -114,5 +114,5 @@ func Schedule() {
 	}
 	signal.Notify(c, signals...)
 	s := <-c
-	fmt.Println("收到信号 > ", s)
+	fmt.Println(">>> 收到信号 > ", s)
 }

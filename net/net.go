@@ -24,8 +24,8 @@ import (
 )
 
 type Controller interface {
-	GetSource() (string)
-	GetSessionID() (SessionID)
+	GetSource() string
+	GetSessionID() SessionID
 	Discard()
 	Read(int) ([]byte, int)
 	Peek(int) ([]byte, int)
@@ -36,14 +36,16 @@ type Controller interface {
 	SendTo(string, ...codecs.IMData) ([]codecs.IMData, error)
 	Close()
 	Schedule()
+	CloseOnSended()
+	GetAssociatedObject() interface{}
 }
 
 type SocketController struct {
-	OnWelcome func(Controller) (error)
-	OnBye func(Controller) (error)
+	OnWelcome func(Controller) error
+	OnBye func(Controller) error
 }
 
-type OnControllerStop func(Controller) (error)
+type OnControllerStop func(Controller) error
 
 type Server interface {
 	Lookup()
@@ -54,7 +56,7 @@ type Server interface {
 type SessionID = uint64
 var mutex sync.Mutex
 
-func NewSessionID() (SessionID) {
+func NewSessionID() SessionID {
 	mutex.Lock()
 	defer mutex.Unlock()
 	s := uint64(time.Now().UnixNano())

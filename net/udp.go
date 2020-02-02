@@ -32,16 +32,19 @@ type UDP struct {
 	Format         *packets.PacketFormat
 	dataNotifyChan chan int
 	controller     *UDPController
+	isClosed       bool
 }
 
 func CreateUDP(format *packets.PacketFormat, codec *codecs.Codec) (*UDP) {
 	s := new(UDP)
 	s.Codec = codec
 	s.Format = format
+	s.isClosed = true
 	return s
 }
 
 func (receiver *UDP) Bind(addr string, port int) (error) {
+	receiver.isClosed = true
 	address := fmt.Sprintf("%s:%d", addr, port)
 	udpAddr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
@@ -53,6 +56,7 @@ func (receiver *UDP) Bind(addr string, port int) (error) {
 		return err
 	}
 
+	receiver.isClosed = false
 	receiver.processClient(*udpConn)
 
 	return nil
@@ -65,7 +69,7 @@ func (receiver *UDP) processClient(conn net.UDPConn) {
 	receiver.controller = createUDPController(conn, dataRW)
 	receiver.controller.OnStop = func(controller Controller) error {
 		utils.LogInfo("udp端口 %s 已经退出监听", controller.GetSessionID())
-		receiver.controller = nil
+		//receiver.controller = nil
 		return nil
 	}
 	receiver.controller.Schedule()
@@ -73,7 +77,7 @@ func (receiver *UDP) processClient(conn net.UDPConn) {
 }
 
 func (receiver *UDP) SendTo(addr string, port int, msgs...codecs.IMData) ([]codecs.IMData, error) {
-	if receiver.controller == nil {
+	if receiver.isClosed {
 		return msgs, errors.ErrorDataSentIncomplete
 	}
 	address := fmt.Sprintf("%s:%d", addr, port)
@@ -81,8 +85,9 @@ func (receiver *UDP) SendTo(addr string, port int, msgs...codecs.IMData) ([]code
 }
 
 func (receiver *UDP) Close() {
-	if receiver.controller != nil {
+	if !receiver.isClosed {
 		receiver.controller.Close()
-		receiver.controller = nil
+		//receiver.controller = nil
+		receiver.isClosed = true
 	}
 }

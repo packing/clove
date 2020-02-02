@@ -21,6 +21,7 @@ import (
 	"nbpy/codecs"
 	"nbpy/net"
 	"nbpy/errors"
+	"reflect"
 )
 
 var ErrorDataNotIsMessageMap = errors.Errorf("The data is not message-map")
@@ -29,76 +30,206 @@ var ErrorKeyIsRequired = errors.Errorf("The message key is required")
 type TagType = int
 
 type Message struct {
+	messageSerial int64
+	messageErrorCode int
+	messageScheme int
 	messageType int
 	messageSync bool
-	messageTag []TagType
+	messageTag codecs.IMSlice
 	messageSessionId []net.SessionID
 	messageBody codecs.IMMap
+	controller net.Controller
+	addr string
 }
 
-func CreateMessage(data codecs.IMData) (*Message, error) {
+func MessageFromData(controller net.Controller, addr string, data codecs.IMData) (*Message, error) {
 	mapData, ok := data.(codecs.IMMap)
 	if !ok {
 		return nil, ErrorDataNotIsMessageMap
 	}
 
-	tp, ok := mapData[ProtocolKeyType]
-	if !ok {
-		return nil, ErrorKeyIsRequired
-	}
-
-	intTp, ok := tp.(int)
-	if !ok {
-		return nil, ErrorKeyIsRequired
-	}
+	reader := codecs.CreateMapReader(mapData)
 
 	msg := new(Message)
-	msg.messageType = intTp
-
-	sync, ok := mapData[ProtocolKeySync]
-	if ok {
-		bsync, ok := sync.(bool)
-		msg.messageSync = ok && bsync
-	}
+	msg.messageType = int(reader.IntValueOf(ProtocolKeyType, 0))
+	msg.messageScheme = int(reader.IntValueOf(ProtocolKeyScheme, 0))
+	msg.messageErrorCode = int(reader.IntValueOf(ProtocolKeyErrorCode, ProtocolErrorCodeOK))
+	msg.messageSync = reader.BoolValueOf(ProtocolKeySync)
+	msg.messageSerial = reader.IntValueOf(ProtocolKeySerial, 0)
 
 	msg.messageSessionId = make([]net.SessionID,0)
-	sessIds, ok := mapData[ProtocolKeySessionId]
-	if ok {
-		sess, ok := sessIds.(codecs.IMSlice)
+	sessIds := reader.TryReadValue(ProtocolKeySessionId)
+	if sessIds != nil {
+		sess, _ := sessIds.(codecs.IMSlice)
 		if ok {
 			msg.messageSessionId = make([]net.SessionID,len(sess))
 			for i, sid := range sess {
-				ssid ,ok := sid.(int)
-				if ok {
-					msg.messageSessionId[i] = net.SessionID(ssid)
-				}
+				ssid := reflect.ValueOf(sid).Uint()
+				msg.messageSessionId[i] = net.SessionID(ssid)
 			}
 		}
 	}
 
-	msg.messageTag = make([]TagType, 0)
-	itagss, ok := mapData[ProtocolKeyTag]
-	if ok {
+	msg.messageTag = make(codecs.IMSlice, 0)
+	itagss := reader.TryReadValue(ProtocolKeyTag)
+	if itagss != nil {
 		itags, ok := itagss.(codecs.IMSlice)
 		if ok {
-			msg.messageTag = make([]TagType,len(itags))
-			for i, itag := range itags {
-				tag ,ok := itag.(int)
-				if ok {
-					msg.messageTag[i] = tag
-				}
+			for _, tag := range itags {
+				msg.messageTag = append(msg.messageTag,tag)
 			}
 		}
 	}
 
 	msg.messageBody = nil
-	ibody, ok := mapData[ProtocolKeyBody]
-	if ok {
+	ibody := reader.TryReadValue(ProtocolKeyBody)
+	if ibody != nil {
 		body, ok := ibody.(codecs.IMMap)
 		if ok {
 			msg.messageBody = body
 		}
 	}
 
+	msg.controller = controller
+	msg.addr = addr
 	return msg, nil
+}
+
+func DataFromMessage(message *Message) (codecs.IMData, error) {
+	msg := make(codecs.IMMap)
+	msg[ProtocolKeyScheme] = message.messageScheme
+	msg[ProtocolKeyType] = message.messageType
+	msg[ProtocolKeyTag] = message.messageTag
+	msg[ProtocolKeySync] = message.messageSync
+
+	ssid := make(codecs.IMSlice, 0)
+	for _, sid := range message.messageSessionId {
+		ssid = append(ssid,sid)
+	}
+
+	msg[ProtocolKeySessionId] = ssid
+	msg[ProtocolKeyBody] = message.messageBody
+	msg[ProtocolKeyErrorCode] = message.messageErrorCode
+	msg[ProtocolKeySerial] = message.messageSerial
+	return msg, nil
+}
+
+func CreateMessage(errorCode, scheme, mtype int, tag codecs.IMSlice, sync bool, sessid []net.SessionID, body codecs.IMMap) (*Message, error) {
+	msg := new(Message)
+	msg.messageScheme = scheme
+	msg.messageType = mtype
+	msg.messageTag = tag
+	msg.messageSync = sync
+	msg.messageSessionId = sessid
+	msg.messageBody = body
+	msg.messageErrorCode = errorCode
+	msg.messageSerial = 0
+	return msg, nil
+}
+
+func (receiver *Message) SetErrorCode(code int) {
+	receiver.messageErrorCode = code
+}
+
+func (receiver Message) GetErrorCode() (int) {
+	return receiver.messageErrorCode
+}
+
+func (receiver *Message) SetScheme(scheme int) {
+	receiver.messageScheme = scheme
+}
+
+func (receiver Message) GetScheme() (int) {
+	return receiver.messageScheme
+}
+
+func (receiver *Message) SetType(tp int) {
+	receiver.messageType = tp
+}
+
+func (receiver Message) GetType() (int) {
+	return receiver.messageType
+}
+
+func (receiver *Message) SetTag(tag TagType) {
+	if receiver.messageTag == nil {
+		receiver.messageTag = make(codecs.IMSlice,0)
+	}
+	for sTag := range receiver.messageTag {
+		if sTag == tag {
+			break
+		}
+	}
+	receiver.messageTag = append(receiver.messageTag, tag)
+}
+
+func (receiver *Message) UnsetTag(tag TagType) {
+	if receiver.messageTag == nil {
+		receiver.messageTag = make(codecs.IMSlice,0)
+	}
+	ts := make(codecs.IMSlice, 0)
+	for sTag := range receiver.messageTag {
+		if sTag != tag {
+			ts = append(ts, sTag)
+		}
+	}
+	receiver.messageTag = ts
+}
+
+func (receiver Message) GetTag() (codecs.IMSlice) {
+	return receiver.messageTag
+}
+
+func (receiver *Message) SetSync(sync bool) {
+	receiver.messageSync = sync
+}
+
+func (receiver Message) GetSync() (bool) {
+	return receiver.messageSync
+}
+
+func (receiver *Message) SetSessionId(sessid []net.SessionID) {
+	receiver.messageSessionId = sessid
+}
+
+func (receiver Message) GetSessionId() ([]net.SessionID) {
+	return receiver.messageSessionId
+}
+
+func (receiver *Message) SetBody(body codecs.IMMap) {
+	receiver.messageBody = body
+}
+
+func (receiver Message) GetBody() (codecs.IMMap) {
+	return receiver.messageBody
+}
+
+func CreateS2SMessage(tp int) (*Message) {
+	msg := new(Message)
+	msg.messageType = tp
+	msg.messageScheme = ProtocolSchemeS2S
+	return msg
+}
+
+func CreateC2SMessage(tp int) (*Message) {
+	msg := new(Message)
+	msg.messageType = tp
+	msg.messageScheme = ProtocolSchemeC2S
+	return msg
+}
+
+func CreateS2CMessage(tp int) (*Message) {
+	msg := new(Message)
+	msg.messageType = tp
+	msg.messageScheme = ProtocolSchemeS2C
+	return msg
+}
+
+func CreateC2SReturnMessage(c2sMsg *Message) (*Message) {
+	msg := new(Message)
+	msg.messageType = c2sMsg.messageType
+	msg.messageScheme = ProtocolSchemeS2C
+	msg.SetSessionId(c2sMsg.GetSessionId())
+	msg.messageSerial = c2sMsg.messageSerial
+	return msg
 }

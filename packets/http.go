@@ -25,6 +25,8 @@ import (
 	"nbpy/bits"
 	"nbpy/errors"
 	"bytes"
+	//"nbpy/utils"
+	//"encoding/binary"
 )
 
 const HttpHeaderMinLength = 16
@@ -36,7 +38,7 @@ type PacketPackagerHTTP struct {
 }
 
 func (receiver PacketParserHTTP) Prepare(in []byte) (error, int, byte, byte, []byte) {
-	return nil, 0, codecs.ProtocolReserved, 0, nil
+	return nil, 0, codecs.ProtocolIM, 2, nil
 }
 
 func (receiver PacketParserHTTP) TryParse(in []byte) (error,bool) {
@@ -63,7 +65,24 @@ func (receiver PacketParserHTTP) Pop(in []byte) (error, *Packet, int) {
 	if len(in) < HttpHeaderMinLength {
 		return errors.ErrorDataNotReady, nil, 0
 	}
-	return nil, nil, 0
+
+	dict := make(codecs.IMMap)
+	dict["http"] = string(in[:])
+	d := codecs.IMData(dict)
+	err, out := codecs.CodecIMv2.Encoder.Encode(&d)
+	if err != nil {
+		return errors.ErrorDataNotReady, nil, 0
+	}
+
+	pck := new(Packet)
+	pck.Raw = out
+	pck.Encrypted = false
+	pck.Compressed = false
+	pck.CompressSupport = false
+	pck.ProtocolType = codecs.ProtocolIM
+	pck.ProtocolVer = 2
+
+	return nil, pck, len(in)
 }
 
 func (receiver PacketPackagerHTTP) Package(pck *Packet, raw []byte) (error, []byte) {

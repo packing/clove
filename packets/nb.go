@@ -51,7 +51,7 @@ type PacketPackagerNB struct {
 }
 
 func (receiver PacketParserNB) Prepare(in []byte) (error, int, byte, byte, []byte) {
-	return nil, 0, codecs.ProtocolReserved, 0, nil
+	return nil, 0, codecs.ProtocolIM, 2, nil
 }
 
 func (receiver PacketParserNB) TryParse(in []byte) (error,bool) {

@@ -31,16 +31,25 @@ type UnixUDP struct {
 	Format         *packets.PacketFormat
 	dataNotifyChan chan int
 	controller     *UnixController
+	isClosed       bool
+
+	associatedObject interface{}
 }
 
 func CreateUnixUDPWithFormat(format *packets.PacketFormat, codec *codecs.Codec) (*UnixUDP) {
 	s := new(UnixUDP)
 	s.Codec = codec
 	s.Format = format
+	s.isClosed = true
 	return s
 }
 
+func (receiver *UnixUDP) SetControllerAssociatedObject(o interface{}) {
+	receiver.associatedObject = o
+}
+
 func (receiver *UnixUDP) Bind(addr string) (error) {
+	receiver.isClosed = true
 	unixAddr, err := net.ResolveUnixAddr("unixgram", addr)
 	if err != nil {
 		return err
@@ -51,6 +60,7 @@ func (receiver *UnixUDP) Bind(addr string) (error) {
 		return err
 	}
 
+	receiver.isClosed = false
 	receiver.processClient(*unixConn)
 
 	return nil
@@ -61,25 +71,35 @@ func (receiver *UnixUDP) processClient(conn net.UnixConn) {
 	dataRW := createDataReadWriter(receiver.Codec, receiver.Format)
 	dataRW.OnDataDecoded = receiver.OnDataDecoded
 	receiver.controller = createUnixController(conn, dataRW)
+	receiver.controller.SetAssociatedObject(receiver.associatedObject)
+
 	receiver.controller.OnStop = func(controller Controller) error {
 		utils.LogInfo("unix端口 %s 已经退出监听", controller.GetSessionID())
 		receiver.controller = nil
+		receiver.isClosed = true
 		return nil
 	}
+
 	receiver.controller.Schedule()
 
 }
 
 func (receiver *UnixUDP) SendTo(addr string, msgs...codecs.IMData) ([]codecs.IMData, error) {
-	if receiver.controller == nil {
+	if receiver.isClosed {
 		return msgs, errors.ErrorDataSentIncomplete
 	}
 	return receiver.controller.SendTo(addr, msgs...)
 }
 
+func (receiver *UnixUDP) SendFileHandler(addr string, fds...int) (error) {
+	return receiver.controller.SendFdTo(addr, fds...)
+}
+
+
 func (receiver *UnixUDP) Close() {
-	if receiver.controller != nil {
-		receiver.controller.Close()
-		receiver.controller = nil
+	if !receiver.isClosed {
+		//receiver.controller.Close()
+		receiver.controller.CloseOnSended()
+		receiver.isClosed = true
 	}
 }

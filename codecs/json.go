@@ -17,6 +17,10 @@
 
 package codecs
 
+import (
+	"encoding/json"
+)
+
 type DecoderJSONv1 struct {
 }
 
@@ -25,11 +29,18 @@ type EncoderJSONv1 struct {
 
 
 func (receiver DecoderJSONv1) Decode(raw []byte) (error, IMData, []byte){
-	return nil, nil, raw
+	dst := make(map[string] interface{})
+	err := json.Unmarshal(raw, &dst)
+	if err != nil && err.Error() == "json: cannot unmarshal array into Go value of type map[string]interface {}" {
+		dst := make([]interface{},0)
+		err = json.Unmarshal(raw, &dst)
+	}
+	return err, dst, []byte("")
 }
 
 func (receiver EncoderJSONv1) Encode(raw *IMData) (error, []byte){
-	return nil, []byte("")
+	bs, err := json.Marshal(raw)
+	return err, bs
 }
 
 var codecJSONv1 = Codec{Protocol:ProtocolJSON, Version:1, Decoder: DecoderJSONv1{}, Encoder: EncoderJSONv1{}}

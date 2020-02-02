@@ -52,7 +52,7 @@ type PacketPackagerNBOrigin struct {
 }
 
 func (receiver PacketParserNBOrigin) Prepare(in []byte) (error, int, byte, byte, []byte) {
-	return nil, 0, codecs.ProtocolReserved, 0, nil
+	return nil, 0, codecs.ProtocolIM, 1, nil
 }
 
 func (receiver PacketParserNBOrigin) TryParse(in []byte) (error,bool) {
@@ -90,6 +90,10 @@ func (receiver PacketParserNBOrigin) Pop(in []byte) (error, *Packet, int) {
 		return errors.ErrorDataNotReady, nil, 0
 	}
 
+	if packetlen < PacketNBOriginHeaderLength {
+		return errors.ErrorDataIsDamage, nil, 0
+	}
+
 	data := in[:packetlen]
 
 	packet := new(Packet)
@@ -107,8 +111,11 @@ func (receiver PacketParserNBOrigin) Pop(in []byte) (error, *Packet, int) {
 	packet.ProtocolVer = 1
 	packet.CompressSupport = (flag & MaskOriginCompressSupport) == MaskOriginCompressSupport
 
-	rdata := data[PacketNBOriginHeaderLength:]
-	packet.Raw = rdata
+	if len(data) >= PacketNBOriginHeaderLength {
+		packet.Raw = data[PacketNBOriginHeaderLength:]
+	}else{
+		packet.Raw = []byte("")
+	}
 
 	return nil, packet, packetlen
 }
