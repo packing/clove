@@ -73,6 +73,13 @@ func (receiver *TCPClient) Connect(addr string, port int) (error) {
 	return err
 }
 
+func (receiver *TCPClient) GetSessionID() (SessionID) {
+	if receiver.controller == nil {
+		return SessionID(0)
+	}
+	return receiver.controller.GetSessionID()
+}
+
 func (receiver *TCPClient) processClient(conn net.Conn) {
 
 	dataRW := createDataReadWriter(receiver.Codec, receiver.Format)

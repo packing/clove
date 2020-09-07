@@ -30,10 +30,24 @@ const (
 	ProtocolKeyBody 		= 0x14
 	ProtocolKeyErrorCode 	= 0x15
 	ProtocolKeySerial 		= 0x16
+	ProtocolKeyId 			= 0x17
+    ProtocolKeyValue 	    = 0x18
+    ProtocolKeyCpu 	        = 0x19
+    ProtocolKeyMem 	        = 0x20
+    ProtocolKeyGoroutine 	= 0x21
 
 	ProtocolTypeDeliver 	= 0x01
 	ProtocolTypeHeart 		= 0x02
 	ProtocolTypeClientLeave = 0x03
+	ProtocolTypeSlaveHello 	= 0x04
+	ProtocolTypeAdapterHello= 0x05
+	ProtocolTypeGatewayHello= 0x06
+	ProtocolTypeKillClient	= 0x07
+
+    ProtocolTagMaster 		= 0x0
+	ProtocolTagSlave 		= 0x01
+    ProtocolTagAdapter 		= 0x02
+	ProtocolTagClient 		= 0x03
 
 	ProtocolErrorCodeOK 	= 0
 )

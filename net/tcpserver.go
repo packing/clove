@@ -26,6 +26,7 @@ import (
 	"nbpy/packets"
 	"nbpy/errors"
 	"nbpy/containers"
+    "os"
 )
 
 /*
@@ -44,10 +45,13 @@ type TCPServer struct {
 	listener       *net.TCPListener
 	controllers    containers.SyncDict
 	isClosed       bool
+	handleTransfer *UnixMsg
+	handleReceiveAddr string
 }
 
 func CreateTCPServer() (*TCPServer) {
 	srv := new(TCPServer)
+    srv.handleTransfer = nil
 	return srv
 }
 
@@ -56,6 +60,19 @@ func CreateTCPServerWithLimit(limit int) (*TCPServer) {
 	srv.limit = limit
 	srv.isClosed = true
 	return srv
+}
+
+func (receiver *TCPServer) SetHandleTransfer(dest string, transfer *UnixMsg) {
+    receiver.handleTransfer = transfer
+    receiver.handleReceiveAddr = dest
+}
+
+func (receiver *TCPServer) GetTotal() int {
+    return receiver.controllers.Count()
+}
+
+func (receiver TCPServer) OnFileHandleReceived(fd int) error {
+    return receiver.processClientFromFileHandle(fd)
 }
 
 func (receiver *TCPServer) Bind(addr string, port int) (error) {
@@ -82,6 +99,15 @@ func (receiver *TCPServer) Bind(addr string, port int) (error) {
 	return err
 }
 
+func (receiver *TCPServer) ServeWithoutListener() (error) {
+    receiver.isClosed = false
+    receiver.controllers = containers.NewSync()
+
+    utils.LogInfo("### 无监听服务启动成功")
+
+    return nil
+}
+
 func (receiver *TCPServer) addController(controller *TCPController) {
 	receiver.controllers.Set(controller.GetSessionID(),controller)
 }
@@ -100,6 +126,43 @@ func (receiver *TCPServer) getController(sessid SessionID) Controller {
 		return ctrl
 	}
 	return nil
+}
+
+func (receiver *TCPServer) processClientFromFileHandle(fd int) error {
+
+    //utils.LogInfo(">>> 接收到转移来到新连接句柄 %d", fd)
+
+    f := os.NewFile(uintptr(fd), "fd-from-old")
+    fc, err := net.FileConn(f)
+    if err != nil {
+    	utils.LogError("构造连接对象失败", err)
+        return err
+    }
+
+    receiver.total += 1
+
+    dataRW := createDataReadWriter(receiver.Codec, receiver.Format)
+    dataRW.OnDataDecoded = receiver.OnDataDecoded
+    controller := createTCPController(fc, dataRW)
+
+    controller.OnStop = func(controller Controller) error {
+        if receiver.OnBye != nil {
+            receiver.OnBye(controller)
+        }
+        receiver.total -= 1
+        receiver.delController(controller)
+        return nil
+    }
+
+    receiver.addController(controller)
+
+    controller.Schedule()
+
+    if receiver.OnWelcome != nil {
+        receiver.OnWelcome(controller)
+    }
+
+    return nil
 }
 
 func (receiver *TCPServer) processClient(conn net.Conn) {
@@ -132,7 +195,7 @@ func (receiver *TCPServer) processClient(conn net.Conn) {
 }
 
 func (receiver *TCPServer) goroutineAccept() {
-	defer utils.LogPanic()
+	defer utils.LogPanic(recover())
 	for {
 		conn, err := receiver.listener.Accept()
 		if err != nil {
@@ -145,7 +208,19 @@ func (receiver *TCPServer) goroutineAccept() {
 			continue
 		}
 
-		receiver.processClient(conn)
+        go func() {
+            if receiver.handleTransfer == nil {
+                receiver.processClient(conn)
+            } else {
+                if s, ok := conn.(*net.TCPConn); ok {
+                    if pf, err := s.File(); err == nil {
+                        //utils.LogError(">>> 转移新连接句柄 %d", int(pf.Fd()))
+                        receiver.handleTransfer.SendTo(receiver.handleReceiveAddr, int(pf.Fd()))
+                    }
+                }
+                conn.Close()
+            }
+        }()
 	}
 	utils.LogError("=== 新连接接收器已关闭")
 }

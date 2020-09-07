@@ -23,7 +23,8 @@ import (
 	"net"
 	"sync"
 	"time"
-	"strings"
+    "runtime"
+    "nbpy/errors"
 )
 
 /*
@@ -80,7 +81,7 @@ func (receiver TCPController) GetSessionID() SessionID {
 
 func (receiver *TCPController) Close() {
 	defer func() {
-		utils.LogPanic()
+		utils.LogPanic(recover())
 	}()
 	receiver.ioinner.Close()
 	if receiver.closeCh != nil {
@@ -107,13 +108,31 @@ func (receiver *TCPController) Peek(l int) ([]byte, int) {
 }
 
 func (receiver *TCPController) Write(data []byte) {
+    if receiver.closeSendReq {
+        return
+    }
 	receiver.sendBuffer.Write(data)
-	//go func() { receiver.sendCh <- 1 }()
+
+	go func() {
+        if receiver.closeSendReq {
+            if receiver.sendCh != nil {
+                close(receiver.sendCh)
+                receiver.sendCh = nil
+            }
+            return
+        }
+	    receiver.sendCh <- 1
+	}()
 }
 
 func (receiver *TCPController) Send(msg ...codecs.IMData) ([]codecs.IMData, error) {
 	//utils.LogVerbose(">>> 连接 %s 发送客户端消息", receiver.GetSource())
+    if receiver.closeSendReq {
+        return msg, errors.ErrorRemoteReqClose
+    }
+    st := time.Now().UnixNano()
 	buf, remainMsgs, err := receiver.DataRW.PackStream(receiver, msg...)
+    IncEncodeTime(time.Now().UnixNano() - st)
 	if err == nil {
 		receiver.Write(buf)
 	}
@@ -136,9 +155,9 @@ func (receiver *TCPController) processData(wg *sync.WaitGroup) {
 	defer func() {
 		receiver.Close()
 		wg.Done()
-		utils.LogPanic()
+		utils.LogPanic(recover())
 	}()
-	utils.LogVerbose(">>> 连接 %s 开始处理数据解析...", receiver.GetSource())
+	//utils.LogVerbose(">>> 连接 %s 开始处理数据解析...", receiver.GetSource())
 	for {
 		n, ok := <- receiver.runableData
 		if !ok {
@@ -147,11 +166,14 @@ func (receiver *TCPController) processData(wg *sync.WaitGroup) {
 		if n == 0 {
 			continue
 		}
+		st := time.Now().UnixNano()
 		err := receiver.DataRW.ReadStream(receiver)
+		IncDecodeTime(time.Now().UnixNano() - st)
 		if err != nil {
 			receiver.Close()
 			break
 		}
+		runtime.Gosched()
 
 	}
 	utils.LogVerbose(">>> 连接 %s 停止处理数据解析", receiver.GetSource())
@@ -161,17 +183,19 @@ func (receiver *TCPController) processRead(wg *sync.WaitGroup) {
 	defer func() {
 		close(receiver.runableData)
 		wg.Done()
-		utils.LogPanic()
+		utils.LogPanic(recover())
 	}()
 
-	var b = make([]byte, 1024)
+	var b = make([]byte, recvbufferSize)
 
-	utils.LogVerbose(">>> 连接 %s 开始处理I/O读取...", receiver.GetSource())
+	//utils.LogVerbose(">>> 连接 %s 开始处理I/O读取...", receiver.GetSource())
 	for {
 		n, err := receiver.ioinner.Read(b)
 		if err == nil && n > 0 {
+		    IncTotalTcpRecvSize(n)
 			receiver.recvBuffer.Write(b[:n])
 			receiver.runableData <- n
+			runtime.Gosched()
 		}
 		if err != nil || n == 0 {
 			break
@@ -185,52 +209,64 @@ func (receiver *TCPController) processRead(wg *sync.WaitGroup) {
 func (receiver *TCPController) processWrite(wg *sync.WaitGroup) {
 	defer func() {
 		wg.Done()
-		utils.LogPanic()
+		utils.LogPanic(recover())
 	}()
 
-	for {
+mainsend:	for {
 		_, ok := <- receiver.sendCh
 		if ok {
-			var repeat = 0
-			buf := make([]byte, 1024)
+			//var repeat = 0
+			buf := make([]byte, sendbufferSize)
 			sendBuffLen, _ := receiver.sendBuffer.Read(buf)
 			for sendBuffLen > 0 {
-				//设置写超时，避免客户端一直不收包，导致服务器内存暴涨
-				receiver.ioinner.SetWriteDeadline(time.Now().Add(10 * time.Second))
+                //设置写超时，避免客户端一直不收包，导致服务器内存暴涨
+                receiver.ioinner.SetWriteDeadline(time.Now().Add(3 * time.Second))
 				sizeWrited, sendErr := receiver.ioinner.Write(buf[:sendBuffLen])
 				if sendErr == nil && sendBuffLen == sizeWrited {
 					if receiver.closeOnSended {
 						receiver.Close()
 					}
+
+					IncTotalTcpSendSize(sendBuffLen)
 					//utils.LogVerbose(">>> 发送完成", sendBuffLen)
-					repeat = 0
+					runtime.Gosched()
+					//repeat = 0
 					sendBuffLen, _ = receiver.sendBuffer.Read(buf)
 					continue
 				}
 				if sendErr != nil {
-					if strings.Contains(sendErr.Error(), "use of closed network connection") {
-						break
-					}
-					if repeat < 1000 {
-						utils.LogError(">>> 连接 %s 发送数据超时或异常,重试", receiver.GetSource())
+                    //if strings.Contains(sendErr.Error(), "use of closed network connection") {
+						//break
+                    //}
+                    //if strings.Contains(sendErr.Error(), "connection reset by peer") {
+                    //    break
+                    //}
+                    //if strings.Contains(sendErr.Error(), "broken pipe") {
+                    //    break
+                    //}
+					/*if repeat < 1 {
+						utils.LogError(">>> 连接 %s 发送数据超时或异常,重试", receiver.GetSource(), sendErr)
 						utils.LogError(sendErr.Error())
 						time.Sleep(500 * time.Microsecond)
+						runtime.Gosched()
 						repeat += 1
 						continue
-					} else {
-						utils.LogError(">>> 连接 %s 发送数据超时或异常,重试次数已满，关闭连接", receiver.GetSource())
+					} else {*/
+						utils.LogError(">>> 连接 %s 发送数据超时或异常，关闭连接", receiver.GetSource())
 						utils.LogError(sendErr.Error())
 						receiver.Close()
-					}
+                    break mainsend
+					//}
 				}
 				break
 			}
 		} else {
-			utils.LogError(">>> 因连接 %s 关闭，退出数据发送处理", receiver.GetSource())
+			//utils.LogError(">>> 因连接 %s 关闭，退出数据发送处理", receiver.GetSource())
 			break
 		}
 	}
 
+    receiver.closeSendReq = true
 	utils.LogVerbose(">>> 连接 %s 停止处理I/O发送", receiver.GetSource())
 }
 
@@ -240,19 +276,22 @@ func (receiver *TCPController) processSchedule(wg *sync.WaitGroup) {
 		//utils.LogPanic()
 	}()
 	for {
-		if receiver.closeSendReq {
-			close(receiver.sendCh)
-			break
-		}
+        if receiver.closeSendReq {
+            if receiver.sendCh != nil {
+                close(receiver.sendCh)
+                receiver.sendCh = nil
+            }
+            return
+        }
 		receiver.sendCh <- 1
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(1 * time.Second)
 	}
 }
 
 func (receiver *TCPController) Schedule() {
 	receiver.runableData = make(chan int, 10240)
 	receiver.closeCh = make(chan int)
-	receiver.sendCh = make(chan int, 10240)
+	receiver.sendCh = make(chan int)
 	wg := new(sync.WaitGroup)
 	wg.Add(4)
 	go func() {
@@ -264,6 +303,6 @@ func (receiver *TCPController) Schedule() {
 		if receiver.OnStop != nil {
 			receiver.OnStop(receiver)
 		}
-		utils.LogError(">>> TCP控制器 %s 已关闭调度", receiver.GetSource())
+		utils.LogVerbose(">>> TCP控制器 %s 已关闭调度", receiver.GetSource())
 	}()
 }

@@ -53,5 +53,5 @@ func (receiver *Peer) InitWithTunnelType(tunnels int) (error) {
 }
 
 func (receiver *Peer) tryDirectConnect() (error) {
-
+	return nil
 }

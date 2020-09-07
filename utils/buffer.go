@@ -20,8 +20,9 @@ func (b *MutexBuffer) Next(n int) ([]byte, int) {
 	b.rw.Lock()
 	defer b.rw.Unlock()
 	var sn = n
-	if b.b.Len() < n {
-		sn = b.b.Len()
+    var bl = b.b.Len()
+	if bl < n {
+		sn = bl
 	}
 	return b.b.Next(sn), sn
 }
@@ -30,12 +31,13 @@ func (b *MutexBuffer) Peek(n int) ([]byte, int) {
 	b.rw.Lock()
 	defer b.rw.Unlock()
 	var sn = n
-	if b.b.Len() < n {
-		sn = b.b.Len()
+	var bl = b.b.Len()
+	if bl < n {
+		sn = bl
 	}
-	var r = make([]byte, sn)
-	copy(r, b.b.Bytes()[:sn])
-	return r, sn
+	//var r = make([]byte, sn)
+	//copy(r, b.b.Bytes()[:sn])
+	return b.b.Bytes()[:sn], sn
 }
 
 func (b *MutexBuffer) Write(p []byte) (int, error) {

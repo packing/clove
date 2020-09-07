@@ -92,7 +92,7 @@ func (receiver DecoderIMv1) Decode(raw []byte) (error, IMData, []byte){
 
 func (receiver DecoderIMv1) readMemoryData(data []byte, dt int8, size uint32) (error, IMData, []byte)  {
 	if uint(len(data)) < uint(size) {
-		utils.LogInfo(" %d <-> %d", len(data), size)
+		//utils.LogInfo(" %d <-> %d", len(data), size)
 		return errors.ErrorDataTooShort, nil, data
 	}
 	switch dt {
@@ -543,6 +543,9 @@ func makeHeaderAndLength(tp byte, lenData int) []byte {
 }
 
 func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte){
+    defer func() {
+        utils.LogPanic(recover())
+    }()
 	if len(raw) == 0 {
 		return errors.ErrorDataNotEnough, nil, raw
 	}
@@ -661,6 +664,9 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte){
 }
 
 func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte){
+    defer func() {
+        utils.LogPanic(recover())
+    }()
 	if *raw == nil {
 		return errors.ErrorTypeNotSupported, []byte("")
 	}
@@ -929,8 +935,8 @@ func (receiver IntermediateValue) Slice() ([] interface{}) {
 	return s
 }
 
-var codecIMv1 = Codec{Protocol:ProtocolIM, Version:1, Decoder: DecoderIMv1{}, Encoder: EncoderIMv1{}}
+var codecIMv1 = Codec{Protocol:ProtocolIM, Version:1, Decoder: DecoderIMv1{}, Encoder: EncoderIMv1{}, Name: "结构化中间数据流"}
 var CodecIMv1 = &codecIMv1
 
-var codecIMv2 = Codec{Protocol:ProtocolIM, Version:2, Decoder: DecoderIMv2{}, Encoder: EncoderIMv2{}}
+var codecIMv2 = Codec{Protocol:ProtocolIM, Version:2, Decoder: DecoderIMv2{}, Encoder: EncoderIMv2{}, Name: "结构化中间数据流"}
 var CodecIMv2 = &codecIMv2

@@ -38,6 +38,7 @@ const WSHeaderMinLength = 16
 const WSDataMinLength = 2
 const WSMagicStr = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 const WSRespFmt = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\nSec-WebSocket-Protocol: %s\r\n\r\n"
+const WSRespFmtWithoutProtocol = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n"
 
 
 var webSocketOrigin = []string{""}
@@ -63,7 +64,11 @@ func (receiver PacketParserWS) Prepare(in []byte) (error, int, byte, byte, []byt
 	accept := key + WSMagicStr
 	hashcode := sha1.Sum([]byte(accept))
 	fk := base64.StdEncoding.EncodeToString(hashcode[:])
-	resp := fmt.Sprintf(WSRespFmt, fk, pto)
+
+    resp := fmt.Sprintf(WSRespFmtWithoutProtocol, fk)
+	if pto != "" {
+        resp = fmt.Sprintf(WSRespFmt, fk, pto)
+    }
 
 	var pton byte = codecs.ProtocolReserved
 	var ptov byte = 0
@@ -86,9 +91,9 @@ func (receiver PacketParserWS) Prepare(in []byte) (error, int, byte, byte, []byt
 		ptov = 1
 		utils.LogInfo(">>> 该连接数据协议为 JSON V1")
 	default:
-		pton = codecs.ProtocolMemory
-		ptov = 1
-		utils.LogInfo(">>> 该连接数据协议为 TEXT V1")
+		pton = codecs.ProtocolReserved
+		ptov = 0
+		utils.LogInfo(">>> 该连接数据协议为 未知")
 	}
 
 	utils.LogInfo(">>> 收到Websocket升级请求，允许升级连接")

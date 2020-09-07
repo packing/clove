@@ -60,7 +60,7 @@ func RemovePID(pidFile string) {
 func ReadPIDs(pidFile string) (error, []int) {
 	pf, err := os.Open(pidFile)
 	if err != nil {
-		LogError("Remove from pidfile error!", err)
+		LogError("read from pidfile error!", err)
 		return err, nil
 	}
 
@@ -68,7 +68,7 @@ func ReadPIDs(pidFile string) (error, []int) {
 	n, err := pf.Read(bs)
 	pf.Close()
 	if err != nil {
-		LogError("Remove from pidfile error!", err)
+		LogError("read from pidfile error!", err)
 		return err, nil
 	}
 	ctx := string(bs[:n])

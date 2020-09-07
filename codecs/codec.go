@@ -47,6 +47,7 @@ type Codec struct {
 	Version byte
 	Decoder Decoder
 	Encoder Encoder
+	Name string
 }
 
 type DecoderMemory struct {}
@@ -357,5 +358,39 @@ func (receiver IMSliceReader) BoolValueOf(index int) bool {
 	return reflect.ValueOf(v).Bool()
 }
 
-var codecMemoryV1 = Codec{Protocol:ProtocolMemory, Version:1, Decoder: DecoderMemory{}, Encoder: EncoderMemory{}}
+var codecMemoryV1 = Codec{Protocol:ProtocolMemory, Version:1, Decoder: DecoderMemory{}, Encoder: EncoderMemory{}, Name: "二进制流"}
 var CodecMemoryV1 = &codecMemoryV1
+
+func Int64FromInterface(v interface{}) int64 {
+	var rv int64 = 0
+	switch v.(type) {
+	case int: rv = int64(v.(int))
+	case int8: rv = int64(v.(int8))
+	case int16: rv = int64(v.(int16))
+	case int32: rv = int64(v.(int32))
+	case int64: rv = int64(v.(int64))
+	case uint: rv = int64(v.(uint))
+	case uint8: rv = int64(v.(uint8))
+	case uint16: rv = int64(v.(uint16))
+	case uint32: rv = int64(v.(uint32))
+	case uint64: rv = int64(v.(uint64))
+	}
+	return rv
+}
+
+func IntFromInterface(v interface{}) int {
+    var rv = 0
+    switch v.(type) {
+    case int: rv = v.(int)
+    case int8: rv = int(v.(int8))
+    case int16: rv = int(v.(int16))
+    case int32: rv = int(v.(int32))
+    case int64: rv = int(v.(int64))
+    case uint: rv = int(v.(uint))
+    case uint8: rv = int(v.(uint8))
+    case uint16: rv = int(v.(uint16))
+    case uint32: rv = int(v.(uint32))
+    case uint64: rv = int(v.(uint64))
+    }
+    return rv
+}

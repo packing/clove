@@ -28,6 +28,7 @@ import (
 	"strings"
 	"syscall"
 	"unsafe"
+	"runtime"
 )
 
 /*
@@ -57,7 +58,9 @@ type UnixController struct {
 
 	queue         chan UnixDatagram
 	closeCh       chan int
+	sendCh        chan int
 	closeOnSended bool
+	closeSendReq  bool
 	associatedObject interface{}
 }
 
@@ -140,6 +143,10 @@ func (receiver *UnixController) WriteTo(addr string, data []byte) {
 	binary.BigEndian.PutUint32(b, l)
 	v.buffer.Write(b)
 	v.buffer.Write(data)
+
+	go func() {
+        receiver.sendCh <- 1
+    }()
 }
 
 func (receiver *UnixController) clearSendBuffer(addr string) {
@@ -152,10 +159,14 @@ func (receiver *UnixController) clearSendBuffer(addr string) {
 }
 
 func (receiver *UnixController) SendTo(addr string, msg ...codecs.IMData) ([]codecs.IMData, error) {
+    st := time.Now().UnixNano()
 	buf, remainMsgs, err := receiver.DataRW.PackDatagram(receiver, msg...)
+    IncEncodeTime(time.Now().UnixNano() - st)
 	if err == nil {
 		receiver.WriteTo(addr, buf)
-	}
+	} else {
+        utils.LogInfo(">>> 请求发送数据时编码器返回错误", err)
+    }
 	return remainMsgs, err
 }
 
@@ -172,13 +183,15 @@ func (receiver UnixController) SendFdTo(addr string, fds...int) (error) {
 }
 
 func (receiver *UnixController) processData(group *sync.WaitGroup) {
-	defer utils.LogPanic()
+	defer utils.LogPanic(recover())
 	for {
 		datagram, ok := <- receiver.queue
 		if !ok {
 			break
 		}
+        st := time.Now().UnixNano()
 		err := receiver.DataRW.ReadDatagram(receiver, datagram.addr, datagram.data)
+        IncDecodeTime(time.Now().UnixNano() - st)
 		if err != nil {
 			receiver.ioinner.Close()
 			break
@@ -189,7 +202,7 @@ func (receiver *UnixController) processData(group *sync.WaitGroup) {
 }
 
 func (receiver *UnixController) processRead(group *sync.WaitGroup) {
-	defer utils.LogPanic()
+	defer utils.LogPanic(recover())
 	var b = make([]byte, 1024 * 1024)
 
 	for {
@@ -197,6 +210,7 @@ func (receiver *UnixController) processRead(group *sync.WaitGroup) {
 		if err != nil {
 			break
 		}
+        IncTotalUnixRecvSize(n)
 
 		bs := make([]byte, n)
 		copy(bs, b[:n])
@@ -220,7 +234,7 @@ func (receiver *UnixController) innerProcessWrite() (bool) {
 			if v.buffer.Len() < 4 {
 				return false
 			}
-			var bb= make([]byte, 4)
+			var bb = make([]byte, 4)
 			v.buffer.Read(bb)
 			sendBuffLen = binary.BigEndian.Uint32(bb)
 			if sendBuffLen > 1024*1024 {
@@ -231,7 +245,7 @@ func (receiver *UnixController) innerProcessWrite() (bool) {
 				return true
 			}
 			var b= make([]byte, sendBuffLen)
-			var osize= len(b)
+			var osize = len(b)
 			if sendBuffLen > 0 {
 				size, err := v.buffer.Read(b)
 				if err == nil {
@@ -282,7 +296,10 @@ func (receiver *UnixController) innerProcessWrite() (bool) {
 		}
 	}
 	if sendedLen == 0 {
-		time.Sleep(1 * time.Millisecond)
+		runtime.Gosched()
+		//time.Sleep(1 * time.Millisecond)
+	} else {
+		IncTotalUnixSendSize(sendedLen)
 	}
 	return false
 }
@@ -290,22 +307,30 @@ func (receiver *UnixController) innerProcessWrite() (bool) {
 func (receiver *UnixController) processWrite(wg *sync.WaitGroup) {
 	defer func() {
 		wg.Done()
-		utils.LogPanic()
+		utils.LogPanic(recover())
 	}()
 
 	for {
-		if receiver.innerProcessWrite() {
-			time.Sleep(1 * time.Millisecond)
-		}
-		b := false
-		select {
-		case <- receiver.closeCh:
-			utils.LogError(">>> 连接 %s 已关闭", receiver.GetSource())
-			b = true
-		default:
-			b = false
-		}
-		if b {
+		_, ok := <- receiver.sendCh
+		if ok {
+			if receiver.innerProcessWrite() {
+				time.Sleep(1 * time.Millisecond)
+			}
+			b := false
+			select {
+			case <-receiver.closeCh:
+				utils.LogError(">>> 连接 %s 已关闭", receiver.GetSource())
+				b = true
+			default:
+				b = false
+			}
+			if b {
+				break
+			} else {
+				//time.Sleep(10 * time.Millisecond)
+			}
+		} else {
+			utils.LogError(">>> 因连接 %s 关闭，退出数据发送处理", receiver.GetSource())
 			break
 		}
 	}
@@ -313,9 +338,25 @@ func (receiver *UnixController) processWrite(wg *sync.WaitGroup) {
 	utils.LogVerbose(">>> 连接 %s 停止处理I/O发送", receiver.GetSource())
 }
 
+func (receiver *UnixController) processSchedule(wg *sync.WaitGroup) {
+	defer func() {
+		wg.Done()
+		//utils.LogPanic()
+	}()
+	for {
+		if receiver.closeSendReq {
+			close(receiver.sendCh)
+			break
+		}
+		receiver.sendCh <- 1
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func (receiver *UnixController) Schedule() {
 	receiver.queue = make(chan UnixDatagram, 10240)
 	receiver.closeCh = make(chan int)
+	receiver.sendCh = make(chan int)
 	group := new(sync.WaitGroup)
 	group.Add(3)
 
@@ -323,7 +364,7 @@ func (receiver *UnixController) Schedule() {
 		go receiver.processData(group)
 		go receiver.processRead(group)
 		go receiver.processWrite(group)
-
+		//go receiver.processSchedule(group)
 		group.Wait()
 		if receiver.OnStop != nil {
 			receiver.OnStop(receiver)

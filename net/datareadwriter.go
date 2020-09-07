@@ -61,7 +61,7 @@ func (receiver *DataReadWriter) ReadStream(controller Controller) (error) {
 		if err != nil {
 			if err == errors.ErrorDataNotMatch {
 				//未能匹配任何封包格式，将会中断该连接
-				utils.LogWarn("该连接未能匹配到任何通信封包协议, 将会被强行关闭")
+				utils.LogWarn("连接 %s 未能匹配到任何通信封包协议, 将会被强行关闭", controller.GetSource())
 				return err
 			} else {
 				//可能数据不足，继续接收事件以等待数据完整
@@ -83,15 +83,19 @@ func (receiver *DataReadWriter) ReadStream(controller Controller) (error) {
 		err, readLen, pto, ptov,  sd := receiver.format.Parser.Prepare(peekData)
 
 		if receiver.codec == nil {
-			//寻找解码器
-			err, codec := env.FindCodec(pto, ptov)
-			if err != nil {
-				//找不到对应到解码器，将会中断该连接
-				utils.LogWarn("连接 0x%X 找不到对应解码器, 将会被强行关闭", controller.GetSessionID())
-				return err
-			}
-
-			receiver.codec = codec
+            if pto == codecs.ProtocolReserved && ptov == 0 && receiver.format == packets.PacketFormatWS {
+                utils.LogWarn("连接 %s 没有指定编解码器类型, 将会使用系统默认类型 %s", controller.GetSource(), wsCodecDefault.Name)
+                receiver.codec = wsCodecDefault
+            } else {
+                //寻找解码器
+                err, codec := env.FindCodec(pto, ptov)
+                if err != nil {
+                    //找不到对应到解码器，将会中断该连接
+                    utils.LogWarn("连接 %s 找不到对应解码器, 将会被强行关闭", controller.GetSource())
+                    return err
+                }
+                receiver.codec = codec
+            }
 		}
 
 		if err == nil && sd != nil {
@@ -118,14 +122,14 @@ dataCtrl:
 		err, packet, readLen := receiver.format.Parser.Pop(peekData)
 		if err != nil {
 			if err != errors.ErrorDataNotReady {
-				utils.LogError("!!! 封包解包失败，连接 0x%X 将被关闭", controller.GetSessionID())
+				utils.LogError("!!! 封包解包失败，连接 %s 将被关闭", controller.GetSource())
 				return err
 			}
 			break dataCtrl
 		}
 
 		if packet == nil {
-			utils.LogError("!!! 封包解包失败，连接 0x%X 将被关闭", controller.GetSessionID())
+			utils.LogError("!!! 封包解包失败，连接 %s 将被关闭", controller.GetSource())
 			return errors.ErrorDataNotMatch
 		}
 
@@ -135,13 +139,13 @@ dataCtrl:
 			err, codec := env.FindCodec(packet.ProtocolType, packet.ProtocolVer)
 			if err != nil {
 				//找不到对应到解码器，将会中断该连接
-				utils.LogWarn("找不到对应解码器, 连接 0x%X 将会被强行关闭", controller.GetSessionID())
+				utils.LogWarn("找不到对应解码器, 连接 %s 将会被强行关闭", controller.GetSource())
 				return err
 			}
 
 			if receiver.codec == nil {
 				//如果并不是直接内存数据流，而编解码器又未能就绪，则直接中断该连接
-				utils.LogError("编解码器未能就绪, 连接 0x%X 将会被强行关闭", controller.GetSessionID())
+				utils.LogError("编解码器未能就绪, 连接 %s 将会被强行关闭", controller.GetSource())
 				return errors.ErrorCodecNotReady
 			}
 			receiver.codec = codec
@@ -162,11 +166,11 @@ dataCtrl:
 				if err == nil {
 					packetData = deEncryptData
 				} else {
-					utils.LogWarn("进行数据解密失败, 连接 0x%X 将会被强行关闭", controller.GetSessionID())
+					utils.LogWarn("进行数据解密失败, 连接 %s 将会被强行关闭", controller.GetSource())
 					return errors.ErrorDecryptFunctionNotBind
 				}
 			} else {
-				utils.LogWarn("连接 0x%X 未绑定解密函数, 将会被强行关闭", controller.GetSessionID())
+				utils.LogWarn("连接 %s 未绑定解密函数, 将会被强行关闭", controller.GetSource())
 				return errors.ErrorDecryptFunctionNotBind
 			}
 		}
@@ -177,11 +181,11 @@ dataCtrl:
 				if err == nil {
 					packetData = rawData
 				} else {
-					utils.LogWarn("进行数据解压缩失败, 连接 0x%X 将会被强行关闭", controller.GetSessionID())
+					utils.LogWarn("进行数据解压缩失败, 连接 %s 将会被强行关闭", controller.GetSource())
 					return errors.ErrorUncompressFunctionNotBind
 				}
 			} else {
-				utils.LogWarn("监听端口 0x%X 未绑定解压缩函数, 将会被强行关闭", controller.GetSessionID())
+				utils.LogWarn("连接 %s 未绑定解压缩函数, 将会被强行关闭", controller.GetSource())
 				return errors.ErrorUncompressFunctionNotBind
 			}
 		}
@@ -191,27 +195,30 @@ dataCtrl:
 		err, msg, remianData := receiver.codec.Decoder.Decode(packetData)
 		if err == nil {
 			if receiver.OnDataDecoded != nil {
+			    IncDecodeInstanceCount()
 				err := receiver.OnDataDecoded(controller, controller.GetSource(), msg)
+                DecDecodeInstanceCount()
 				if err != nil {
-					utils.LogError("逻辑处理返回错误 > %s, 连接 0x%X 将会被强行关闭",err.Error(), controller.GetSessionID())
+					utils.LogError("逻辑处理返回错误 > %s, 连接 %s 将会被强行关闭",err.Error(), controller.GetSource())
 					return err
 				}
 			}
 			packetData = remianData
-			if len(packetData) > 0{
+			if len(packetData) > 0 {
 				goto dataDecode
 			}
-		}else if err != errors.ErrorDataNotEnough {
-			utils.LogWarn("进行数据解码失败, 连接 0x%X 将会被强行关闭", controller.GetSessionID())
+		} else if err != errors.ErrorDataNotEnough {
+			utils.LogWarn("进行数据解码失败, 连接 %s 将会被强行关闭", controller.GetSource())
 			return err
 		} else {
+		    /*
 			if receiver.OnDataDecoded != nil {
 				err := receiver.OnDataDecoded(controller, controller.GetSource(), []byte(""))
 				if err != nil {
-					utils.LogError("逻辑处理返回错误 > %s, 连接 0x%X 将会被强行关闭",err.Error(), controller.GetSessionID())
+					utils.LogError("逻辑处理返回错误 > %s, 连接 0x%X 将会被强行关闭",err.Error(), controller.GetSource())
 					return err
 				}
-			}
+			}*/
 		}
 	}
 	return nil
@@ -219,11 +226,11 @@ dataCtrl:
 
 func (receiver *DataReadWriter) PackStream(controller Controller, msgs ...codecs.IMData) ([]byte, []codecs.IMData, error) {
 	if receiver.format == nil {
-		utils.LogWarn("!!! 发送未编码数据失败，连接 0x%X 封包解包器未就绪", controller.GetSessionID())
+		utils.LogWarn("!!! 发送未编码数据失败，连接 %s 封包解包器未就绪", controller.GetSource())
 		return []byte(""), msgs, errors.ErrorPacketFormatNotReady
 	}
 	if receiver.codec == nil {
-		utils.LogWarn("!!! 发送未编码数据失败，连接 0x%X 封包解包器未就绪", controller.GetSessionID())
+		utils.LogWarn("!!! 发送未编码数据失败，连接 %s 编解码器未就绪", controller.GetSource())
 		return []byte(""), msgs, errors.ErrorCodecNotReady
 	}
 
@@ -277,12 +284,12 @@ func (receiver *DataReadWriter) PackStream(controller Controller, msgs ...codecs
 func (receiver *DataReadWriter) ReadDatagram(controller Controller, from string, data []byte) (error) {
 
 	if receiver.format != packets.PacketFormatNBOrigin && receiver.format != packets.PacketFormatNB {
-		utils.LogError("封包解包器未能就绪, 连接 0x%X 将会被强行关闭", controller.GetSessionID())
+		utils.LogError("封包解包器未能就绪, 连接 %s 将会被强行关闭", controller.GetSource())
 		return errors.ErrorPacketFormatNotReady
 	}
 
 	if receiver.codec != codecs.CodecIMv1 && receiver.codec != codecs.CodecIMv2 {
-		utils.LogError("编解码器未能就绪, 连接 0x%X 将会被强行关闭", controller.GetSessionID())
+		utils.LogError("编解码器未能就绪, 连接 %s 将会被强行关闭", controller.GetSource())
 		return errors.ErrorCodecNotReady
 	}
 
@@ -291,12 +298,12 @@ func (receiver *DataReadWriter) ReadDatagram(controller Controller, from string,
 	if receiver.format.UnixNeed {
 		err, packet, _ := receiver.format.Parser.Pop(data)
 		if err != nil {
-			utils.LogError("!!! 封包解包失败，连接 0x%X 将被关闭", controller.GetSessionID())
+			utils.LogError("!!! 封包解包失败，连接 %s 将被关闭", controller.GetSource())
 			return err
 		}
 
 		if packet == nil {
-			utils.LogError("!!! 封包解包失败，连接 0x%X 将被关闭", controller.GetSessionID())
+			utils.LogError("!!! 封包解包失败，连接 %s 将被关闭", controller.GetSource())
 			return errors.ErrorDataNotMatch
 		}
 
@@ -310,7 +317,7 @@ dataDecode:
 		if receiver.OnDataDecoded != nil {
 			err := receiver.OnDataDecoded(controller, controller.GetSource(), msg)
 			if err != nil {
-				utils.LogError("逻辑处理返回错误 > %s, 连接 0x%X 将会被强行关闭",err.Error(), controller.GetSessionID())
+				utils.LogError("逻辑处理返回错误 > %s, 连接 %s 将会被强行关闭",err.Error(), controller.GetSource())
 				return err
 			}
 		}
@@ -319,7 +326,7 @@ dataDecode:
 			goto dataDecode
 		}
 	}else {
-		utils.LogWarn("进行数据解码失败, 连接 0x%X 将会被强行关闭", controller.GetSessionID())
+		utils.LogWarn("进行数据解码失败, 连接 %s 将会被强行关闭", controller.GetSource())
 		return err
 	}
 	return nil
@@ -328,12 +335,12 @@ dataDecode:
 func (receiver *DataReadWriter) PackDatagram(controller Controller, msgs ...codecs.IMData) ([]byte, []codecs.IMData, error) {
 
 	if receiver.format != packets.PacketFormatNBOrigin && receiver.format != packets.PacketFormatNB {
-		utils.LogError("封包打包器未能就绪, 连接 0x%X 将会被强行关闭", controller.GetSessionID())
+		utils.LogError("封包打包器未能就绪, 连接 %s 将会被强行关闭", controller.GetSessionID())
 		return []byte(""), msgs, errors.ErrorPacketFormatNotReady
 	}
 
 	if receiver.codec != codecs.CodecIMv1 && receiver.codec != codecs.CodecIMv2 {
-		utils.LogError("编解码器未能就绪, 连接 0x%X 将会被强行关闭", controller.GetSessionID())
+		utils.LogError("编解码器未能就绪, 连接 %s 将会被强行关闭", controller.GetSessionID())
 		return []byte(""), msgs, errors.ErrorCodecNotReady
 	}
 
@@ -345,6 +352,7 @@ func (receiver *DataReadWriter) PackDatagram(controller Controller, msgs ...code
 		if err == nil {
 			encodeDatas = append(encodeDatas, data)
 		}else{
+			utils.LogError("连接 %s 编解码器返回了一个错误", controller.GetSessionID(), err)
 			errorMsgs = msgs[i:]
 			break
 		}

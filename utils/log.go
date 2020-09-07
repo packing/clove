@@ -119,8 +119,12 @@ func LogError(format string, v ...interface{}) {
 	logAndLevel(LogLevelError, format, v...)
 }
 
-func LogPanic() {
-	if err := recover(); err != nil {
+func LogPanic(ierr interface{}) {
+	if ierr == nil {
+		return
+	}
+	err, ok := ierr.(error)
+	if ok && err != nil {
 		var st = func(all bool) string {
 			// Reserve 1K buffer at first
 			buf := make([]byte, 512)

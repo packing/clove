@@ -28,6 +28,9 @@ import (
 	"syscall"
 	"os/signal"
 	"fmt"
+	"runtime"
+	"strings"
+	"strconv"
 )
 
 var collectionCodecs map[byte] *codecs.Codec
@@ -38,10 +41,10 @@ func RegisterCodec(codec *codecs.Codec) (error) {
 	if collectionCodecs == nil {
 		collectionCodecs = make(map[byte] *codecs.Codec)
 	}
-	utils.LogVerbose(">>> 注册编解码器 封包协议[%d] 版本[%d]", codec.Protocol, codec.Version)
+	utils.LogVerbose(">>> 注册编解码器 封包协议[%d][ver.%d] [%s]", codec.Protocol, codec.Version, codec.Name)
 	_, ok := collectionCodecs[k]
 	if ok {
-		return errors.Errorf("!!! 封包协议[%d] 版本[%d] 已经注册，无需重复注册", codec.Protocol, codec.Version)
+		return errors.Errorf("!!! 封包协议[%d][%s] 版本[%d] 已经注册，无需重复注册", codec.Protocol, codec.Version, codec.Name)
 	}
 
 	collectionCodecs[k] = codec
@@ -97,7 +100,7 @@ func MatchPacketFormat(data []byte) (error, *packets.PacketFormat) {
 	return errors.ErrorDataNotMatch, nil
 }
 
-func Schedule() {
+func Schedule() os.Signal {
 
 	//定时器实现
 
@@ -111,8 +114,28 @@ func Schedule() {
 		syscall.SIGHUP,
 		syscall.SIGINT,
 		syscall.SIGQUIT,
+		syscall.SIGUSR1,
+        syscall.SIGUSR2,
 	}
 	signal.Notify(c, signals...)
 	s := <-c
-	fmt.Println(">>> 收到信号 > ", s)
+	utils.LogVerbose(">>> 收到信号 > %s", s.String())
+	return s
+}
+
+func GetGoroutineId() int {
+	defer func()  {
+		if err := recover(); err != nil {
+			fmt.Println("get goroutine id error", err)
+			}
+	}()
+
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
+	id, err := strconv.Atoi(idField)
+	if err != nil {
+		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
+	}
+	return id
 }

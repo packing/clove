@@ -39,6 +39,7 @@ type Message struct {
 	messageSessionId []net.SessionID
 	messageBody codecs.IMMap
 	controller net.Controller
+	messageSrcData codecs.IMData
 	addr string
 }
 
@@ -92,6 +93,7 @@ func MessageFromData(controller net.Controller, addr string, data codecs.IMData)
 
 	msg.controller = controller
 	msg.addr = addr
+	msg.messageSrcData = data
 	return msg, nil
 }
 
@@ -125,6 +127,10 @@ func CreateMessage(errorCode, scheme, mtype int, tag codecs.IMSlice, sync bool, 
 	msg.messageErrorCode = errorCode
 	msg.messageSerial = 0
 	return msg, nil
+}
+
+func (receiver Message) GetSrcData() (codecs.IMData) {
+    return receiver.messageSrcData
 }
 
 func (receiver *Message) SetErrorCode(code int) {

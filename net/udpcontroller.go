@@ -119,7 +119,7 @@ func (receiver UDPController) SendTo(addr string, msg ...codecs.IMData) ([]codec
 }
 
 func (receiver *UDPController) processData(group *sync.WaitGroup) {
-	defer utils.LogPanic()
+	defer utils.LogPanic(recover())
 	for {
 		datagram, ok := <- receiver.queue
 		if !ok {
@@ -136,7 +136,7 @@ func (receiver *UDPController) processData(group *sync.WaitGroup) {
 
 }
 func (receiver *UDPController) processRead(group *sync.WaitGroup) {
-	defer utils.LogPanic()
+	defer utils.LogPanic(recover())
 	var b = make([]byte, 1024 * 1024)
 
 	for {

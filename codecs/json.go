@@ -43,5 +43,5 @@ func (receiver EncoderJSONv1) Encode(raw *IMData) (error, []byte){
 	return err, bs
 }
 
-var codecJSONv1 = Codec{Protocol:ProtocolJSON, Version:1, Decoder: DecoderJSONv1{}, Encoder: EncoderJSONv1{}}
+var codecJSONv1 = Codec{Protocol:ProtocolJSON, Version:1, Decoder: DecoderJSONv1{}, Encoder: EncoderJSONv1{}, Name: "JSON数据流"}
 var CodecJSONv1 = &codecJSONv1
