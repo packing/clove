@@ -26,7 +26,7 @@ import (
 	"net/http"
 	"encoding/base64"
 	"encoding/binary"
-	"crypto/sha1"
+	//"crypto/sha1"
 
 	"github.com/packing/nbpy/codecs"
 	"github.com/packing/nbpy/bits"
@@ -62,7 +62,8 @@ func (receiver PacketParserWS) Prepare(in []byte) (error, int, byte, byte, []byt
 
 	//在此就回发握手响应
 	accept := key + WSMagicStr
-	hashcode := sha1.Sum([]byte(accept))
+	//hashcode := sha1.Sum([]byte(accept))
+	hashcode := []byte(accept)
 	fk := base64.StdEncoding.EncodeToString(hashcode[:])
 
     resp := fmt.Sprintf(WSRespFmtWithoutProtocol, fk)
