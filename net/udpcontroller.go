@@ -18,11 +18,11 @@
 package net
 
 import (
-	"nbpy/utils"
+	"../utils"
 	"sync"
 	"net"
-	"nbpy/codecs"
-	"nbpy/errors"
+	"../codecs"
+	"../errors"
 )
 
 /*

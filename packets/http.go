@@ -21,12 +21,10 @@ import (
 	"net/http"
 	"bufio"
 	"strings"
-	"nbpy/codecs"
-	"nbpy/bits"
-	"nbpy/errors"
+	"../codecs"
+	"../bits"
+	"../errors"
 	"bytes"
-	//"nbpy/utils"
-	//"encoding/binary"
 )
 
 const HttpHeaderMinLength = 16

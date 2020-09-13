@@ -18,8 +18,8 @@
 package messages
 
 import (
-	"nbpy/codecs"
-	"nbpy/net"
+	"../codecs"
+	"../net"
 )
 
 type MessageQueue chan *Message

@@ -18,10 +18,10 @@
 package net
 
 import (
-	"nbpy/utils"
-	"nbpy/codecs"
-	"nbpy/packets"
-	"nbpy/errors"
+	"../utils"
+	"../codecs"
+	"../packets"
+	"../errors"
 	"net"
 	"fmt"
 )

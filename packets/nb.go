@@ -20,8 +20,8 @@ package packets
 import (
 	"encoding/binary"
 	"bytes"
-	"nbpy/codecs"
-	"nbpy/errors"
+	"../codecs"
+	"../errors"
 )
 
 /*

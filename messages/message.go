@@ -18,9 +18,9 @@
 package messages
 
 import (
-	"nbpy/codecs"
-	"nbpy/net"
-	"nbpy/errors"
+	"../codecs"
+	"../net"
+	"../errors"
 	"reflect"
 )
 

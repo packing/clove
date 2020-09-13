@@ -19,8 +19,8 @@ package net
 
 import (
     "net"
-    "nbpy/errors"
-    "nbpy/utils"
+    "../errors"
+    "../utils"
 )
 
 type UnixMsg struct {

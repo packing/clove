@@ -19,10 +19,10 @@ package net
 
 import (
 	"net"
-	"nbpy/codecs"
-	"nbpy/packets"
-	"nbpy/errors"
-	"nbpy/utils"
+	"../codecs"
+	"../packets"
+	"../errors"
+	"../utils"
 )
 
 type UnixUDP struct {
