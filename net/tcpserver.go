@@ -20,12 +20,12 @@ package net
 import (
 	"net"
 	"fmt"
-	"../utils"
+	"github.com/packing/nbpy/utils"
 	"strings"
-	"../codecs"
-	"../packets"
-	"../errors"
-	"../containers"
+	"github.com/packing/nbpy/codecs"
+	"github.com/packing/nbpy/packets"
+	"github.com/packing/nbpy/errors"
+	"github.com/packing/nbpy/containers"
     "os"
 )
 

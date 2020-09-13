@@ -18,7 +18,7 @@
 package codecs
 
 import (
-	"../errors"
+	"github.com/packing/nbpy/errors"
 	"reflect"
 )
 

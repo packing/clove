@@ -21,9 +21,9 @@ package net
 import (
 	"net"
 	"fmt"
-	"../utils"
-	"../codecs"
-	"../packets"
+	"github.com/packing/nbpy/utils"
+	"github.com/packing/nbpy/codecs"
+	"github.com/packing/nbpy/packets"
 )
 
 type TCPClient struct {

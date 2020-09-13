@@ -18,7 +18,7 @@
 package net
 
 import (
-	"../codecs"
+	"github.com/packing/nbpy/codecs"
 	"sync"
 	"time"
 )

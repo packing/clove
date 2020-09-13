@@ -18,12 +18,12 @@
 package net
 
 import (
-	"../env"
-	"../packets"
-	"../utils"
-	"../codecs"
+	"github.com/packing/nbpy/env"
+	"github.com/packing/nbpy/packets"
+	"github.com/packing/nbpy/utils"
+	"github.com/packing/nbpy/codecs"
 	"bytes"
-	"../errors"
+	"github.com/packing/nbpy/errors"
 )
 
 type DataController struct {

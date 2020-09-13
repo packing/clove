@@ -18,11 +18,11 @@
 package net
 
 import (
-	"../utils"
+	"github.com/packing/nbpy/utils"
 	"sync"
 	"net"
-	"../codecs"
-	"../errors"
+	"github.com/packing/nbpy/codecs"
+	"github.com/packing/nbpy/errors"
 	"time"
 	"encoding/binary"
 	"strings"

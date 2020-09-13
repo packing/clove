@@ -19,10 +19,10 @@ package packets
 
 import (
 	"encoding/binary"
-	"../codecs"
+	"github.com/packing/nbpy/codecs"
 	"hash/crc32"
 	"bytes"
-	"../errors"
+	"github.com/packing/nbpy/errors"
 )
 
 /*

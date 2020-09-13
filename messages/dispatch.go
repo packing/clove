@@ -3,7 +3,7 @@ package messages
 import (
 	"fmt"
 	"time"
-	"../utils"
+	"github.com/packing/nbpy/utils"
     "sync"
 )
 

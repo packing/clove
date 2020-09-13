@@ -28,10 +28,10 @@ import (
 	"encoding/binary"
 	"crypto/sha1"
 
-	"../codecs"
-	"../bits"
-	"../utils"
-	"../errors"
+	"github.com/packing/nbpy/codecs"
+	"github.com/packing/nbpy/bits"
+	"github.com/packing/nbpy/utils"
+	"github.com/packing/nbpy/errors"
 )
 
 const WSHeaderMinLength = 16

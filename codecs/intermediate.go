@@ -19,12 +19,12 @@ package codecs
 
 import (
 	"encoding/binary"
-	"../errors"
+	"github.com/packing/nbpy/errors"
 	"math"
 	"bytes"
 	"reflect"
 	"unsafe"
-	"../utils"
+	"github.com/packing/nbpy/utils"
 )
 
 const (

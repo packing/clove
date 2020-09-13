@@ -18,13 +18,13 @@
 package caches
 
 import (
-    "../net"
-    "../codecs"
+    "github.com/packing/nbpy/net"
+    "github.com/packing/nbpy/codecs"
     "fmt"
     "os"
-    "../errors"
+    "github.com/packing/nbpy/errors"
     "strings"
-    "../packets"
+    "github.com/packing/nbpy/packets"
     "reflect"
 )
 

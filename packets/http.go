@@ -21,9 +21,9 @@ import (
 	"net/http"
 	"bufio"
 	"strings"
-	"../codecs"
-	"../bits"
-	"../errors"
+	"github.com/packing/nbpy/codecs"
+	"github.com/packing/nbpy/bits"
+	"github.com/packing/nbpy/errors"
 	"bytes"
 )
 

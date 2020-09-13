@@ -18,12 +18,12 @@
 package env
 
 import (
-	"../codecs"
-	"../packets"
-	"../errors"
+	"github.com/packing/nbpy/codecs"
+	"github.com/packing/nbpy/packets"
+	"github.com/packing/nbpy/errors"
 	"reflect"
 	"sort"
-	"../utils"
+	"github.com/packing/nbpy/utils"
 	"os"
 	"syscall"
 	"os/signal"
