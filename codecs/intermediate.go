@@ -19,12 +19,12 @@ package codecs
 
 import (
 	"encoding/binary"
-	"github.com/packing/nbpy/errors"
+	nberrors "github.com/packing/nbpy/errors"
 	"math"
 	"bytes"
 	"reflect"
 	"unsafe"
-	"github.com/packing/nbpy/utils"
+	nbutils "github.com/packing/nbpy/utils"
 )
 
 const (
@@ -71,10 +71,10 @@ type EncoderIMv1 struct {
 
 func (receiver DecoderIMv1) Decode(raw []byte) (error, IMData, []byte){
 	if len(raw) == 0 {
-		return errors.ErrorDataNotEnough, nil, raw
+		return nberrors.ErrorDataNotEnough, nil, raw
 	}
 	if len(raw) < IMDataHeaderLength {
-		return errors.ErrorDataTooShort, nil, raw
+		return nberrors.ErrorDataTooShort, nil, raw
 	}
 
 	dataType := int8(raw[0])
@@ -93,17 +93,17 @@ func (receiver DecoderIMv1) Decode(raw []byte) (error, IMData, []byte){
 func (receiver DecoderIMv1) readMemoryData(data []byte, dt int8, size uint32) (error, IMData, []byte)  {
 	if uint(len(data)) < uint(size) {
 		//utils.LogInfo(" %d <-> %d", len(data), size)
-		return errors.ErrorDataTooShort, nil, data
+		return nberrors.ErrorDataTooShort, nil, data
 	}
 	switch dt {
 	case IMDataTypeInt:
 		if size != 4 {
-			return errors.ErrorDataIsDamage, nil, data
+			return nberrors.ErrorDataIsDamage, nil, data
 		}
 		return nil, int(binary.LittleEndian.Uint32(data[:size])), data[size:]
 	case IMDataTypeInt64:
 		if size != 8 {
-			return errors.ErrorDataIsDamage, nil, data
+			return nberrors.ErrorDataIsDamage, nil, data
 		}
 		if unsafe.Sizeof(0x0) == 8{
 			return nil, int(binary.LittleEndian.Uint64(data[:size])), data[size:]
@@ -113,22 +113,22 @@ func (receiver DecoderIMv1) readMemoryData(data []byte, dt int8, size uint32) (e
 	case IMDataTypeStr: fallthrough
 	case IMDataTypePyStr:
 		if size > 4096 {
-			return errors.ErrorDataIsDamage, nil, data
+			return nberrors.ErrorDataIsDamage, nil, data
 		}
 		return nil, string(data[:size]), data[size:]
 	case IMDataTypeFloat:
 		if size != 4 {
-			return errors.ErrorDataIsDamage, nil, data
+			return nberrors.ErrorDataIsDamage, nil, data
 		}
 		return nil, math.Float32frombits(binary.LittleEndian.Uint32(data[:size])), data[size:]
 	case IMDataTypeBool:
 		if size != 1 {
-			return errors.ErrorDataIsDamage, nil, data
+			return nberrors.ErrorDataIsDamage, nil, data
 		}
 		return nil, data[0] != 0, data[size:]
 	case IMDataTypeDouble:
 		if size != 8 {
-			return errors.ErrorDataIsDamage, nil, data
+			return nberrors.ErrorDataIsDamage, nil, data
 		}
 		return nil, math.Float64frombits(binary.LittleEndian.Uint64(data[:size])), data[size:]
 	case IMDataTypeMap:
@@ -145,16 +145,16 @@ func (receiver DecoderIMv1) readMemoryData(data []byte, dt int8, size uint32) (e
 		} else if size == 4 {
 			return nil, int(binary.LittleEndian.Uint32(data[:size])), data[size:]
 		} else {
-			return errors.ErrorDataIsDamage, nil, data
+			return nberrors.ErrorDataIsDamage, nil, data
 		}
 	case IMDataTypeShort:
 		if size != 2 {
-			return errors.ErrorDataIsDamage, nil, data
+			return nberrors.ErrorDataIsDamage, nil, data
 		}
 		return nil, int(binary.LittleEndian.Uint16(data[:size])), data[size:]
 	case IMDataTypeChar:
 		if size != 1 {
-			return errors.ErrorDataIsDamage, nil, data
+			return nberrors.ErrorDataIsDamage, nil, data
 		}
 		return nil, int(data[0]), data[size:]
 
@@ -162,11 +162,11 @@ func (receiver DecoderIMv1) readMemoryData(data []byte, dt int8, size uint32) (e
 	case IMDataTypePBuffer: fallthrough
 	case IMDataTypeMemory:
 		if size > 4096 {
-			return errors.ErrorDataIsDamage, nil, data
+			return nberrors.ErrorDataIsDamage, nil, data
 		}
 		return nil, data, data[size:]
 	default:
-		return errors.Errorf("Type %b is not supported", dt), nil, data
+		return nberrors.Errorf("Type %b is not supported", dt), nil, data
 	}
 	return nil, nil, data
 }
@@ -179,7 +179,7 @@ func (receiver DecoderIMv1) readMap(data []byte) (error, IMMap, []byte) {
 	for ; i < count; i ++ {
 		itemData := remain
 		if len(itemData) < IMDataHeaderLength * 2 {
-			return errors.ErrorDataIsDamage, nil, nil
+			return nberrors.ErrorDataIsDamage, nil, nil
 		}
 		keyDataType := int8(itemData[0])
 		keyDataSize := binary.LittleEndian.Uint32(itemData[1:5])
@@ -187,7 +187,7 @@ func (receiver DecoderIMv1) readMap(data []byte) (error, IMMap, []byte) {
 		valueDataSize := binary.LittleEndian.Uint32(itemData[6:10])
 
 		if len(itemData) < int(IMDataHeaderLength * 2 + keyDataSize + valueDataSize) {
-			return errors.ErrorDataIsDamage, nil, nil
+			return nberrors.ErrorDataIsDamage, nil, nil
 		}
 
 		err, key, _ := receiver.readMemoryData(itemData[10:], keyDataType, keyDataSize)
@@ -211,13 +211,13 @@ func (receiver DecoderIMv1) readSlice(data []byte) (error, IMSlice, []byte) {
 
 		itemData := remain
 		if len(itemData) < IMDataHeaderLength {
-			return errors.ErrorDataTooShort, ret, remain
+			return nberrors.ErrorDataTooShort, ret, remain
 		}
 		valueDataType := int8(itemData[0])
 		valueDataSize := binary.LittleEndian.Uint32(itemData[1:5])
 
 		if uint(len(itemData)) < uint(IMDataHeaderLength + valueDataSize) {
-			return errors.ErrorDataTooShort, ret, remain
+			return nberrors.ErrorDataTooShort, ret, remain
 		}
 
 		err, val, newRemain := receiver.readMemoryData(itemData[5:], valueDataType, valueDataSize)
@@ -281,7 +281,7 @@ func (receiver EncoderIMv1) encodeValueHeader(data *IMData, datasize uint32) (er
 				}
 				tp = IMDataTypeList
 			} else {
-				return errors.Errorf("Type %s is not supported", reflect.ValueOf(data).Type().Kind()), nil
+				return nberrors.Errorf("Type %s is not supported", reflect.ValueOf(data).Type().Kind()), nil
 			}
 		}
 	}
@@ -372,7 +372,7 @@ func (receiver EncoderIMv1) encodeValueWithoutHeader(data *IMData) (error, []byt
 				}
 				b = buff.Bytes()
 			} else {
-				return errors.Errorf("Type %s is not supported", reflect.ValueOf(data).Type().String()), nil
+				return nberrors.Errorf("Type %s is not supported", reflect.ValueOf(data).Type().String()), nil
 			}
 		}
 	}
@@ -544,13 +544,13 @@ func makeHeaderAndLength(tp byte, lenData int) []byte {
 
 func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte){
     defer func() {
-        utils.LogPanic(recover())
+		nbutils.LogPanic(recover())
     }()
 	if len(raw) == 0 {
-		return errors.ErrorDataNotEnough, nil, raw
+		return nberrors.ErrorDataNotEnough, nil, raw
 	}
 	if len(raw) < 1 {
-		return errors.ErrorDataTooShort, nil, raw
+		return nberrors.ErrorDataTooShort, nil, raw
 	}
 
 	fByte := raw[0]
@@ -566,19 +566,19 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte){
 	switch lenSizeType {
 	case 1:
 		if len(raw) < 2 {
-			return errors.ErrorDataTooShort, nil, raw
+			return nberrors.ErrorDataTooShort, nil, raw
 		}
 		realData = raw[2:]
 		elementCount = uint32(raw[1])
 	case 2:
 		if len(raw) < 3 {
-			return errors.ErrorDataTooShort, nil, raw
+			return nberrors.ErrorDataTooShort, nil, raw
 		}
 		realData = raw[3:]
 		elementCount = uint32(binary.BigEndian.Uint16(raw[1:3]))
 	case 3:
 		if len(raw) < 5 {
-			return errors.ErrorDataTooShort, nil, raw
+			return nberrors.ErrorDataTooShort, nil, raw
 		}
 		realData = raw[5:]
 		elementCount = binary.BigEndian.Uint32(raw[1:5])
@@ -590,7 +590,7 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte){
 	if elementType != IMV2DataTypeMap && elementType != IMV2DataTypeList {
 		if uint32(len(realData)) < elementCount {
 			//如果数据长度不符合预期，可以断定非法数据
-			return errors.ErrorDataTooShort, nil, nil
+			return nberrors.ErrorDataTooShort, nil, nil
 		}
 	}
 
@@ -665,10 +665,10 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte){
 
 func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte){
     defer func() {
-        utils.LogPanic(recover())
+		nbutils.LogPanic(recover())
     }()
 	if *raw == nil {
-		return errors.ErrorTypeNotSupported, []byte("")
+		return nberrors.ErrorTypeNotSupported, []byte("")
 	}
 	var rawValue = reflect.ValueOf(*raw)
 	var tpKind = rawValue.Type().Kind()
@@ -849,7 +849,7 @@ func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte){
 		return nil, bytes.Join(rbs, []byte(""))
 	}
 
-	return errors.ErrorTypeNotSupported, nil
+	return nberrors.ErrorTypeNotSupported, nil
 }
 
 

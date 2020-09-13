@@ -18,7 +18,7 @@
 package caches
 
 import (
-    "github.com/packing/nbpy/net"
+    nbnet "github.com/packing/nbpy/net"
     "github.com/packing/nbpy/codecs"
     "fmt"
     "os"
@@ -78,8 +78,8 @@ func convertToInt64(v interface{}, def int64) (int64) {
 }
 
 type KeyValueCache struct {
-    udpUnix    *net.UnixUDP
-    tcpNormal  *net.TCPClient
+    udpUnix    *nbnet.UnixUDP
+    tcpNormal  *nbnet.TCPClient
     addr       string
     keepAlive  bool // only tcp mode
     lookupChan chan interface{}
@@ -91,7 +91,7 @@ func CreateKeyValueCache(addr string, keepAlive bool) (*KeyValueCache) {
     return kv
 }
 
-func onKeyValueMsgRet(controller net.Controller, _ string, msg codecs.IMData) error {
+func onKeyValueMsgRet(controller nbnet.Controller, _ string, msg codecs.IMData) error {
     ao := controller.GetAssociatedObject()
     if ao == nil {
         return nil
@@ -151,7 +151,7 @@ func (receiver *KeyValueCache) Initialize(addr string, keepAlive bool) (error) {
     receiver.keepAlive = keepAlive
     receiver.lookupChan = make(chan interface{}, 10240)
     if strings.Contains(addr, ":") {
-        receiver.tcpNormal = net.CreateTCPClient(packets.PacketFormatNB, codecs.CodecIMv2)
+        receiver.tcpNormal = nbnet.CreateTCPClient(packets.PacketFormatNB, codecs.CodecIMv2)
         receiver.tcpNormal.SetControllerAssociatedObject(receiver)
         receiver.tcpNormal.OnDataDecoded = onKeyValueMsgRet
         if receiver.keepAlive {
@@ -163,7 +163,7 @@ func (receiver *KeyValueCache) Initialize(addr string, keepAlive bool) (error) {
             return nil
         }
     } else {
-        receiver.udpUnix = net.CreateUnixUDPWithFormat(packets.PacketFormatNB, codecs.CodecIMv2)
+        receiver.udpUnix = nbnet.CreateUnixUDPWithFormat(packets.PacketFormatNB, codecs.CodecIMv2)
         receiver.udpUnix.OnDataDecoded = onKeyValueMsgRet
         receiver.udpUnix.SetControllerAssociatedObject(receiver)
         myAddr := fmt.Sprintf("/tmp/nbkv_client_%d.sock", os.Getpid())

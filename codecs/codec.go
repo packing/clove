@@ -18,7 +18,7 @@
 package codecs
 
 import (
-	"github.com/packing/nbpy/errors"
+	nberrors "github.com/packing/nbpy/errors"
 	"reflect"
 )
 
@@ -59,7 +59,7 @@ type EncoderMemory struct {}
 func (receiver EncoderMemory) Encode(raw *IMData) (error, []byte) {
 	data, ok := (*raw).([]byte)
 	if !ok {
-		return errors.ErrorTypeNotSupported, nil
+		return nberrors.ErrorTypeNotSupported, nil
 	}
 	return nil, data
 }
