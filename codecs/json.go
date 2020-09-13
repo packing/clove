@@ -19,7 +19,6 @@ package codecs
 
 import (
 	"encoding/json"
-	"github.com/packing/nbpy/codecs"
 )
 
 type DecoderJSONv1 struct {
