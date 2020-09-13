@@ -18,7 +18,7 @@
 package caches
 
 import (
-    nbnet "github.com/packing/nbpy/net"
+    nbnet "github.com/packing/nbpy/nnet"
     "github.com/packing/nbpy/codecs"
     "fmt"
     "os"

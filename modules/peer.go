@@ -17,7 +17,7 @@
 
 package modules
 
-import "github.com/packing/nbpy/net"
+import "github.com/packing/nbpy/nnet"
 
 const (
 	TunnelDirect 	= 1

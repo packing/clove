@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package net
+package nnet
 
 import (
     "github.com/packing/nbpy/utils"

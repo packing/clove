@@ -19,7 +19,7 @@ package messages
 
 import (
 	"github.com/packing/nbpy/codecs"
-	"github.com/packing/nbpy/net"
+	"github.com/packing/nbpy/nnet"
 )
 
 type MessageQueue chan *Message

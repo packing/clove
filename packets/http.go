@@ -18,7 +18,7 @@
 package packets
 
 import (
-	"net/http"
+	//"net/http"
 	"bufio"
 	"strings"
 	"github.com/packing/nbpy/codecs"
