@@ -19,12 +19,43 @@ package codecs
 
 import (
 	"encoding/json"
+	"github.com/packing/nbpy/codecs"
 )
 
 type DecoderJSONv1 struct {
 }
 
 type EncoderJSONv1 struct {
+}
+
+func tsMap(m map[string] interface{}) IMMap {
+	rm := make(IMMap)
+	for k, v := range m {
+		switch v.(type) {
+		case map[string] interface{}:
+			rm[k] = tsMap(v.(map[string] interface{}))
+		case []interface{}:
+			rm[k] = tsSlice(v.([]interface{}))
+		default:
+			rm[k] = v
+		}
+	}
+	return rm
+}
+
+func tsSlice(s []interface{}) IMSlice {
+	rs := make(IMSlice, len(s))
+	for i, v := range s {
+		switch v.(type) {
+		case map[string] interface{}:
+			rs[i] = tsMap(v.(map[string] interface{}))
+		case []interface{}:
+			rs[i] = tsSlice(v.([]interface{}))
+		default:
+			rs[i] = v
+		}
+	}
+	return rs
 }
 
 
@@ -34,8 +65,10 @@ func (receiver DecoderJSONv1) Decode(raw []byte) (error, IMData, []byte){
 	if err != nil && err.Error() == "json: cannot unmarshal array into Go value of type map[string]interface {}" {
 		dst := make([]interface{},0)
 		err = json.Unmarshal(raw, &dst)
+		return err, tsSlice(dst), []byte("")
+	} else {
+		return err, tsMap(dst), []byte("")
 	}
-	return err, dst, []byte("")
 }
 
 func (receiver EncoderJSONv1) Encode(raw *IMData) (error, []byte){
