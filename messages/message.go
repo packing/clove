@@ -36,14 +36,14 @@ type Message struct {
 	messageType int
 	messageSync bool
 	messageTag codecs.IMSlice
-	messageSessionId []net.SessionID
+	messageSessionId []nnet.SessionID
 	messageBody codecs.IMMap
-	controller net.Controller
+	controller nnet.Controller
 	messageSrcData codecs.IMData
 	addr string
 }
 
-func MessageFromData(controller net.Controller, addr string, data codecs.IMData) (*Message, error) {
+func MessageFromData(controller nnet.Controller, addr string, data codecs.IMData) (*Message, error) {
 	mapData, ok := data.(codecs.IMMap)
 	if !ok {
 		return nil, ErrorDataNotIsMessageMap
@@ -58,15 +58,15 @@ func MessageFromData(controller net.Controller, addr string, data codecs.IMData)
 	msg.messageSync = reader.BoolValueOf(ProtocolKeySync)
 	msg.messageSerial = reader.IntValueOf(ProtocolKeySerial, 0)
 
-	msg.messageSessionId = make([]net.SessionID,0)
+	msg.messageSessionId = make([]nnet.SessionID,0)
 	sessIds := reader.TryReadValue(ProtocolKeySessionId)
 	if sessIds != nil {
 		sess, _ := sessIds.(codecs.IMSlice)
 		if ok {
-			msg.messageSessionId = make([]net.SessionID,len(sess))
+			msg.messageSessionId = make([]nnet.SessionID,len(sess))
 			for i, sid := range sess {
 				ssid := reflect.ValueOf(sid).Uint()
-				msg.messageSessionId[i] = net.SessionID(ssid)
+				msg.messageSessionId[i] = nnet.SessionID(ssid)
 			}
 		}
 	}
@@ -116,7 +116,7 @@ func DataFromMessage(message *Message) (codecs.IMData, error) {
 	return msg, nil
 }
 
-func CreateMessage(errorCode, scheme, mtype int, tag codecs.IMSlice, sync bool, sessid []net.SessionID, body codecs.IMMap) (*Message, error) {
+func CreateMessage(errorCode, scheme, mtype int, tag codecs.IMSlice, sync bool, sessid []nnet.SessionID, body codecs.IMMap) (*Message, error) {
 	msg := new(Message)
 	msg.messageScheme = scheme
 	msg.messageType = mtype
@@ -194,11 +194,11 @@ func (receiver Message) GetSync() (bool) {
 	return receiver.messageSync
 }
 
-func (receiver *Message) SetSessionId(sessid []net.SessionID) {
+func (receiver *Message) SetSessionId(sessid []nnet.SessionID) {
 	receiver.messageSessionId = sessid
 }
 
-func (receiver Message) GetSessionId() ([]net.SessionID) {
+func (receiver Message) GetSessionId() ([]nnet.SessionID) {
 	return receiver.messageSessionId
 }
 

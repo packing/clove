@@ -34,10 +34,10 @@ type PeerInfo struct {
 }
 
 type Peer struct {
-	io *net.UDP
+	io *nnet.UDP
 	local PeerInfo
 	trustPeers []PeerInfo
-	peers map[net.SessionID] PeerInfo
+	peers map[nnet.SessionID] PeerInfo
 }
 
 func (receiver *Peer) Init() (error) {

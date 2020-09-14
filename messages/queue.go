@@ -24,7 +24,7 @@ import (
 
 type MessageQueue chan *Message
 
-func (receiver MessageQueue) Push(controller net.Controller, addr string, data codecs.IMData) (error) {
+func (receiver MessageQueue) Push(controller nnet.Controller, addr string, data codecs.IMData) (error) {
 	msg, err := MessageFromData(controller, addr, data)
 	if err != nil {
 		return err

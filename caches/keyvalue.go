@@ -18,7 +18,7 @@
 package caches
 
 import (
-    nbnet "github.com/packing/nbpy/nnet"
+    "github.com/packing/nbpy/nnet"
     "github.com/packing/nbpy/codecs"
     "fmt"
     "os"
@@ -78,8 +78,8 @@ func convertToInt64(v interface{}, def int64) (int64) {
 }
 
 type KeyValueCache struct {
-    udpUnix    *nbnet.UnixUDP
-    tcpNormal  *nbnet.TCPClient
+    udpUnix    *nnet.UnixUDP
+    tcpNormal  *nnet.TCPClient
     addr       string
     keepAlive  bool // only tcp mode
     lookupChan chan interface{}
@@ -91,7 +91,7 @@ func CreateKeyValueCache(addr string, keepAlive bool) (*KeyValueCache) {
     return kv
 }
 
-func onKeyValueMsgRet(controller nbnet.Controller, _ string, msg codecs.IMData) error {
+func onKeyValueMsgRet(controller nnet.Controller, _ string, msg codecs.IMData) error {
     ao := controller.GetAssociatedObject()
     if ao == nil {
         return nil
@@ -151,7 +151,7 @@ func (receiver *KeyValueCache) Initialize(addr string, keepAlive bool) (error) {
     receiver.keepAlive = keepAlive
     receiver.lookupChan = make(chan interface{}, 10240)
     if strings.Contains(addr, ":") {
-        receiver.tcpNormal = nbnet.CreateTCPClient(packets.PacketFormatNB, codecs.CodecIMv2)
+        receiver.tcpNormal = nnet.CreateTCPClient(packets.PacketFormatNB, codecs.CodecIMv2)
         receiver.tcpNormal.SetControllerAssociatedObject(receiver)
         receiver.tcpNormal.OnDataDecoded = onKeyValueMsgRet
         if receiver.keepAlive {
@@ -163,7 +163,7 @@ func (receiver *KeyValueCache) Initialize(addr string, keepAlive bool) (error) {
             return nil
         }
     } else {
-        receiver.udpUnix = nbnet.CreateUnixUDPWithFormat(packets.PacketFormatNB, codecs.CodecIMv2)
+        receiver.udpUnix = nnet.CreateUnixUDPWithFormat(packets.PacketFormatNB, codecs.CodecIMv2)
         receiver.udpUnix.OnDataDecoded = onKeyValueMsgRet
         receiver.udpUnix.SetControllerAssociatedObject(receiver)
         myAddr := fmt.Sprintf("/tmp/nbkv_client_%d.sock", os.Getpid())
@@ -188,7 +188,7 @@ func (receiver *KeyValueCache) execCmd(cmd int, key string, value interface{}) (
     if value != nil {
         req[KeyValueFieldValue] = value
     }
-    req[KeyValueFieldSid] = fmt.Sprintf("nbkv_sid_%d_%d", os.Getpid(), net.NewSessionID())
+    req[KeyValueFieldSid] = fmt.Sprintf("nbkv_sid_%d_%d", os.Getpid(), nnet.NewSessionID())
     if receiver.udpUnix != nil {
         myAddr := fmt.Sprintf("/tmp/nbkv_client_%d.sock", os.Getpid())
         req[KeyValueFieldFrom] = myAddr
