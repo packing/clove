@@ -45,6 +45,7 @@ type UDPController struct {
 
 	queue         chan UDPDatagram
 	associatedObject interface{}
+	tag 			int
 }
 
 func createUDPController(ioSrc net.UDPConn, dataRW *DataReadWriter) (*UDPController) {
@@ -63,6 +64,14 @@ func (receiver *UDPController) SetAssociatedObject(o interface{}) {
 
 func (receiver UDPController) GetAssociatedObject() (interface{}) {
 	return receiver.associatedObject
+}
+
+func (receiver *UDPController) SetTag(tag int) {
+	receiver.tag = tag
+}
+
+func (receiver *UDPController) GetTag() int {
+	return receiver.tag
 }
 
 func (receiver UDPController) GetSource() (string){

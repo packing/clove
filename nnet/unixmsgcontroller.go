@@ -46,6 +46,8 @@ type UnixMsgController struct {
 
     queue         chan UnixMsgData
     associatedObject interface{}
+
+    tag         int
 }
 
 func createUnixMsgController(ioSrc net.UnixConn) (*UnixMsgController) {
@@ -62,6 +64,14 @@ func (receiver *UnixMsgController) SetAssociatedObject(o interface{}) {
 
 func (receiver *UnixMsgController) GetAssociatedObject() (interface{}) {
     return receiver.associatedObject
+}
+
+func (receiver *UnixMsgController) SetTag(tag int) {
+    receiver.tag = tag
+}
+
+func (receiver *UnixMsgController) GetTag() int {
+    return receiver.tag
 }
 
 func (receiver UnixMsgController) GetSource() (string){

@@ -62,6 +62,8 @@ type UnixController struct {
     closeOnSended    bool
     closeSendReq     bool
     associatedObject interface{}
+
+    tag             int
 }
 
 func createUnixController(ioSrc net.UnixConn, dataRW *DataReadWriter) (*UnixController) {
@@ -74,6 +76,14 @@ func createUnixController(ioSrc net.UnixConn, dataRW *DataReadWriter) (*UnixCont
     sor.closeOnSended = false
     sor.associatedObject = nil
     return sor
+}
+
+func (receiver *UnixController) SetTag(tag int) {
+    receiver.tag = tag
+}
+
+func (receiver *UnixController) GetTag() int {
+    return receiver.tag
 }
 
 func (receiver *UnixController) SetAssociatedObject(o interface{}) {

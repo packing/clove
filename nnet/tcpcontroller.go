@@ -48,6 +48,7 @@ type TCPController struct {
 	closeOnSended bool
 	closeSendReq bool
 	associatedObject interface{}
+	tag         int
 }
 
 func createTCPController(ioSrc net.Conn, dataRW *DataReadWriter) *TCPController {
@@ -69,6 +70,14 @@ func (receiver *TCPController) SetAssociatedObject(o interface{}) {
 
 func (receiver TCPController) GetAssociatedObject() (interface{}) {
 	return receiver.associatedObject
+}
+
+func (receiver *TCPController) SetTag(tag int) {
+    receiver.tag = tag
+}
+
+func (receiver *TCPController) GetTag() int {
+    return receiver.tag
 }
 
 func (receiver TCPController) GetSource() string {

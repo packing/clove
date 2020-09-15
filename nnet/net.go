@@ -38,6 +38,8 @@ type Controller interface {
 	Schedule()
 	CloseOnSended()
 	GetAssociatedObject() interface{}
+    GetTag() int
+    SetTag(int)
 }
 
 type SocketController struct {
