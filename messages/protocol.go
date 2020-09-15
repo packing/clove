@@ -35,6 +35,9 @@ const (
     ProtocolKeyCpu 	        = 0x19
     ProtocolKeyMem 	        = 0x20
     ProtocolKeyGoroutine 	= 0x21
+	ProtocolKeyUnixAddr 	= 0x22
+	ProtocolKeyTcpAddr 		= 0x23
+	ProtocolKeyFreeVM 		= 0x24
 
 	ProtocolTypeDeliver 	= 0x01
 	ProtocolTypeHeart 		= 0x02
