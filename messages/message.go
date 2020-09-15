@@ -129,6 +129,14 @@ func CreateMessage(errorCode, scheme, mtype int, tag codecs.IMSlice, sync bool, 
 	return msg, nil
 }
 
+func (receiver Message) GetSource() (string) {
+	return receiver.addr
+}
+
+func (receiver Message) GetController() (nnet.Controller) {
+    return receiver.controller
+}
+
 func (receiver Message) GetSrcData() (codecs.IMData) {
     return receiver.messageSrcData
 }
