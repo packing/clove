@@ -46,7 +46,7 @@ type TCPServer struct {
 	isClosed       bool
 	handleTransfer *UnixMsg
 	handleReceiveAddr string
-	OnConnectAccepted func(conn *net.Conn) error
+	OnConnectAccepted func(conn net.Conn) error
 }
 
 func CreateTCPServer() (*TCPServer) {
@@ -213,7 +213,7 @@ func (receiver *TCPServer) goroutineAccept() {
                 receiver.processClient(conn)
             } else {
                 if receiver.OnConnectAccepted != nil {
-                    receiver.OnConnectAccepted(&conn)
+                    receiver.OnConnectAccepted(conn)
                 }
                 conn.Close()
             }
