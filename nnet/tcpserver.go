@@ -34,7 +34,6 @@ goroutine 1 => process accept
 goroutine 2 => process data unpack/decode/logic-make/encode/pack
 */
 
-
 type TCPServer struct {
 	DataController
 	SocketController
@@ -47,6 +46,7 @@ type TCPServer struct {
 	isClosed       bool
 	handleTransfer *UnixMsg
 	handleReceiveAddr string
+	OnConnectAccepted func(int) error
 }
 
 func CreateTCPServer() (*TCPServer) {
@@ -215,7 +215,10 @@ func (receiver *TCPServer) goroutineAccept() {
                 if s, ok := conn.(*net.TCPConn); ok {
                     if pf, err := s.File(); err == nil {
                         //utils.LogError(">>> 转移新连接句柄 %d", int(pf.Fd()))
-                        receiver.handleTransfer.SendTo(receiver.handleReceiveAddr, int(pf.Fd()))
+                        //receiver.handleTransfer.SendTo(receiver.handleReceiveAddr, int(pf.Fd()))
+                        if receiver.OnConnectAccepted != nil {
+                            receiver.OnConnectAccepted(int(pf.Fd()))
+                        }
                     }
                 }
                 conn.Close()
