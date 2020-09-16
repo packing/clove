@@ -119,7 +119,7 @@ func (receiver UDPController) WriteTo(addr string, data []byte) {
 	receiver.ioinner.WriteToUDP(data, udpAddr)
 }
 
-func (receiver UDPController) SendTo(addr string, msg ...codecs.IMData) ([]codecs.IMData, error) {
+func (receiver *UDPController) SendTo(addr string, msg ...codecs.IMData) ([]codecs.IMData, error) {
 	buf, remainMsgs, err := receiver.DataRW.PackDatagram(receiver, msg...)
 	if err == nil {
 		receiver.WriteTo(addr, buf)
@@ -164,7 +164,7 @@ func (receiver *UDPController) processRead(group *sync.WaitGroup) {
 	group.Done()
 }
 
-func (receiver UDPController) Schedule() {
+func (receiver *UDPController) Schedule() {
 	receiver.queue = make(chan UDPDatagram, 10240)
 	go func() {
 		group := new(sync.WaitGroup)
