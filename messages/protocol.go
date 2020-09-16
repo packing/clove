@@ -38,6 +38,7 @@ const (
 	ProtocolKeyUnixAddr 	= 0x22
 	ProtocolKeyTcpAddr 		= 0x23
 	ProtocolKeyHost 		= 0x24
+	ProtocolKeyUnixMsgAddr 	= 0x25
 
 	ProtocolTypeDeliver 	= 0x01
 	ProtocolTypeHeart 		= 0x02
