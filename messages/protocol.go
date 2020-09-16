@@ -47,7 +47,7 @@ const (
 	ProtocolTypeGatewayHello= 0x06
 	ProtocolTypeKillClient	= 0x07
 	ProtocolTypeAdapters	= 0x08
-	ProtocolTypeSlave		= 0x09
+	ProtocolTypeSlaves		= 0x09
 
     ProtocolTagMaster 		= 0x0
 	ProtocolTagSlave 		= 0x01
