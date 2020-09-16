@@ -48,6 +48,12 @@ const (
 	ProtocolTypeKillClient	= 0x07
 	ProtocolTypeAdapters	= 0x08
 	ProtocolTypeSlaves		= 0x09
+	ProtocolTypeSlaveCome	= 0x10
+	ProtocolTypeSlaveBye	= 0x11
+	ProtocolTypeAdapterCome	= 0x12
+	ProtocolTypeAdapterBye	= 0x13
+	ProtocolTypeAdapterChange	= 0x14
+	ProtocolTypeSlaveChange		= 0x15
 
     ProtocolTagMaster 		= 0x0
 	ProtocolTagSlave 		= 0x01
