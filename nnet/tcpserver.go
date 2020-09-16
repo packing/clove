@@ -209,12 +209,10 @@ func (receiver *TCPServer) goroutineAccept() {
 		}
 
         go func() {
-            if receiver.handleTransfer == nil {
+            if receiver.OnConnectAccepted == nil {
                 receiver.processClient(conn)
             } else {
-                if receiver.OnConnectAccepted != nil {
-                    receiver.OnConnectAccepted(conn)
-                }
+                receiver.OnConnectAccepted(conn)
                 conn.Close()
             }
         }()
