@@ -24,7 +24,6 @@ import (
 	"time"
 	"io"
 	"runtime"
-	"github.com/ossrs/go-oryx-lib/logger"
 )
 
 const (
