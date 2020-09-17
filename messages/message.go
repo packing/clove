@@ -41,6 +41,7 @@ type Message struct {
 	controller nnet.Controller
 	messageSrcData codecs.IMData
 	addr string
+	unixAddr string
 }
 
 func MessageFromData(controller nnet.Controller, addr string, data codecs.IMData) (*Message, error) {
@@ -57,6 +58,7 @@ func MessageFromData(controller nnet.Controller, addr string, data codecs.IMData
 	msg.messageErrorCode = int(reader.IntValueOf(ProtocolKeyErrorCode, ProtocolErrorCodeOK))
 	msg.messageSync = reader.BoolValueOf(ProtocolKeySync)
 	msg.messageSerial = reader.IntValueOf(ProtocolKeySerial, 0)
+	msg.unixAddr = reader.StrValueOf(ProtocolKeyUnixAddr, "")
 
 	msg.messageSessionId = make([]nnet.SessionID,0)
 	sessIds := reader.TryReadValue(ProtocolKeySessionId)
@@ -127,6 +129,10 @@ func CreateMessage(errorCode, scheme, mtype int, tag codecs.IMSlice, sync bool, 
 	msg.messageErrorCode = errorCode
 	msg.messageSerial = 0
 	return msg, nil
+}
+
+func (receiver Message) GetUnixSource() (string) {
+	return receiver.unixAddr
 }
 
 func (receiver Message) GetSource() (string) {
