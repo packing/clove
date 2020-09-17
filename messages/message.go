@@ -21,7 +21,6 @@ import (
 	"github.com/packing/nbpy/codecs"
 	"github.com/packing/nbpy/nnet"
 	"github.com/packing/nbpy/errors"
-	"reflect"
 )
 
 var ErrorDataNotIsMessageMap = errors.Errorf("The data is not message-map")
@@ -67,7 +66,7 @@ func MessageFromData(controller nnet.Controller, addr string, data codecs.IMData
 		if ok {
 			msg.messageSessionId = make([]nnet.SessionID,len(sess))
 			for i, sid := range sess {
-				ssid := reflect.ValueOf(sid).Uint()
+				ssid := codecs.Int64FromInterface(sid)
 				msg.messageSessionId[i] = nnet.SessionID(ssid)
 			}
 		}
