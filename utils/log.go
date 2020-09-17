@@ -24,6 +24,7 @@ import (
 	"time"
 	"io"
 	"runtime"
+	"github.com/ossrs/go-oryx-lib/logger"
 )
 
 const (
@@ -99,6 +100,20 @@ func logAndLevel(level int, format string, v ...interface{}) {
 	} else {
 		log.SetFlags(log.Ltime)
 		log.SetPrefix(fmt.Sprintf("[%s]", LogLevelTags[level]))
+		log.Println(s)
+	}
+}
+
+func LogRaw(s string) {
+	var logger *log.Logger = nil
+	if len(logPrefix) > 0 {
+		err, iowriter := getLogIO()
+		if err != nil {
+			return
+		}
+		logger = log.New(iowriter, "", 0)
+		logger.Println(s)
+	} else {
 		log.Println(s)
 	}
 }

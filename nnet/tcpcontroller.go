@@ -93,10 +93,10 @@ func (receiver *TCPController) Close() {
 		utils.LogPanic(recover())
 	}()
 	receiver.ioinner.Close()
-	if receiver.closeCh != nil {
-		close(receiver.closeCh)
-		receiver.closeCh = nil
-	}
+	//if receiver.closeCh != nil {
+	//	close(receiver.closeCh)
+	//	receiver.closeCh = nil
+	//}
 	//go func() { receiver.closeCh <- 1 }()
 }
 
@@ -299,7 +299,7 @@ func (receiver *TCPController) processSchedule(wg *sync.WaitGroup) {
 
 func (receiver *TCPController) Schedule() {
 	receiver.runableData = make(chan int, 10240)
-	receiver.closeCh = make(chan int)
+	//receiver.closeCh = make(chan int)
 	receiver.sendCh = make(chan int)
 	wg := new(sync.WaitGroup)
 	wg.Add(4)
