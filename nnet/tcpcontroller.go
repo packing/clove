@@ -92,6 +92,7 @@ func (receiver *TCPController) Close() {
 	defer func() {
 		utils.LogPanic(recover())
 	}()
+	receiver.closeSendReq = true
 	receiver.ioinner.Close()
 	//if receiver.closeCh != nil {
 	//	close(receiver.closeCh)
@@ -124,10 +125,6 @@ func (receiver *TCPController) Write(data []byte) {
 
 	go func() {
         if receiver.closeSendReq {
-            if receiver.sendCh != nil {
-                close(receiver.sendCh)
-                receiver.sendCh = nil
-            }
             return
         }
 	    receiver.sendCh <- 1
@@ -286,10 +283,6 @@ func (receiver *TCPController) processSchedule(wg *sync.WaitGroup) {
 	}()
 	for {
         if receiver.closeSendReq {
-            if receiver.sendCh != nil {
-                close(receiver.sendCh)
-                receiver.sendCh = nil
-            }
             return
         }
 		receiver.sendCh <- 1
@@ -311,6 +304,10 @@ func (receiver *TCPController) Schedule() {
 		wg.Wait()
 		if receiver.OnStop != nil {
 			receiver.OnStop(receiver)
+		}
+		if receiver.sendCh != nil {
+			close(receiver.sendCh)
+			receiver.sendCh = nil
 		}
 		utils.LogVerbose(">>> TCP控制器 %s 已关闭调度", receiver.GetSource())
 	}()
