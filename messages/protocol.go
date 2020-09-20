@@ -61,6 +61,8 @@ const (
 	ProtocolTagSlave 		= 0x01
     ProtocolTagAdapter 		= 0x02
 	ProtocolTagClient 		= 0x03
+    ProtocolTagStorage 		= 0x04
+    ProtocolTagPeer 		= 0x05
 
 	ProtocolErrorCodeOK 	= 0
 )
