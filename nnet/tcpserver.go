@@ -305,19 +305,31 @@ func (receiver *TCPServer) CloseController(sessionid SessionID) error {
 }
 
 
-func (receiver *TCPServer) Send(sessionid SessionID, data []byte) error {
+func (receiver *TCPServer) Send(sessionid SessionID, msg ...codecs.IMData) ([]codecs.IMData, error) {
 	if receiver.isClosed {
-		return errors.ErrorSessionIsNotExists
-	}
-	/*processor := receiver.getController(sessionid)
-	if processor == nil {
 		return msg, errors.ErrorSessionIsNotExists
 	}
-	return processor.Send(msg...)
-	*/
-	ts := TCPSend{sessionId:sessionid, data:data}
-	go func() {
-	    receiver.sendChan <- ts
+
+    dr := createDataReadWriter(receiver.Codec, receiver.Format)
+    st := time.Now().UnixNano()
+    buf, rm, err := dr.PackDatagram(nil, msg...)
+    IncEncodeTime(time.Now().UnixNano() - st)
+    if err != nil {
+        return msg, errors.ErrorDataNotReady
+    }
+
+    receiver.RawSend(sessionid, buf)
+    return rm, err
+}
+
+
+func (receiver *TCPServer) RawSend(sessionid SessionID, data []byte) error {
+    if receiver.isClosed {
+        return errors.ErrorSessionIsNotExists
+    }
+    ts := TCPSend{sessionId:sessionid, data:data}
+    go func() {
+        receiver.sendChan <- ts
     }()
 
     return nil
@@ -341,7 +353,7 @@ func (receiver *TCPServer) Mutilcast(sessionids []SessionID,msg ...codecs.IMData
 		if controller == nil {
 			continue
 		}
-		receiver.Send(sessionid, buf)
+		receiver.RawSend(sessionid, buf)
 	}
 }
 
@@ -358,7 +370,7 @@ func (receiver *TCPServer) Boardcast(msg ...codecs.IMData) {
         return
     }
 
-    receiver.Send(0, buf)
+    receiver.RawSend(0, buf)
 
     /*
 	for v := range receiver.controllers.IterItems() {
