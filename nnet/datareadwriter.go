@@ -334,12 +334,12 @@ dataDecode:
 
 func (receiver *DataReadWriter) PackDatagram(controller Controller, msgs ...codecs.IMData) ([]byte, []codecs.IMData, error) {
 
-	if receiver.format != packets.PacketFormatNBOrigin && receiver.format != packets.PacketFormatNB {
+	if controller != nil && receiver.format != packets.PacketFormatNBOrigin && receiver.format != packets.PacketFormatNB {
 		utils.LogError("封包打包器未能就绪, 连接 %s 将会被强行关闭", controller.GetSessionID())
 		return []byte(""), msgs, errors.ErrorPacketFormatNotReady
 	}
 
-	if receiver.codec != codecs.CodecIMv1 && receiver.codec != codecs.CodecIMv2 {
+	if controller != nil && receiver.codec != codecs.CodecIMv1 && receiver.codec != codecs.CodecIMv2 {
 		utils.LogError("编解码器未能就绪, 连接 %s 将会被强行关闭", controller.GetSessionID())
 		return []byte(""), msgs, errors.ErrorCodecNotReady
 	}
@@ -352,7 +352,9 @@ func (receiver *DataReadWriter) PackDatagram(controller Controller, msgs ...code
 		if err == nil {
 			encodeDatas = append(encodeDatas, data)
 		}else{
-			utils.LogError("连接 %s 编解码器返回了一个错误", controller.GetSessionID(), err)
+			if controller != nil {
+				utils.LogError("连接 %s 编解码器返回了一个错误", controller.GetSessionID(), err)
+			}
 			errorMsgs = msgs[i:]
 			break
 		}

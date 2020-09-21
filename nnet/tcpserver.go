@@ -27,12 +27,18 @@ import (
 	"github.com/packing/nbpy/errors"
 	"github.com/packing/nbpy/containers"
     "os"
+    "time"
 )
 
 /*
 goroutine 1 => process accept
 goroutine 2 => process data unpack/decode/logic-make/encode/pack
 */
+
+type TCPSend struct {
+    sessionId SessionID
+    data    []byte
+}
 
 type TCPServer struct {
 	DataController
@@ -47,6 +53,8 @@ type TCPServer struct {
 	handleTransfer *UnixMsg
 	handleReceiveAddr string
 	OnConnectAccepted func(conn net.Conn) error
+
+	sendChan        chan TCPSend
 }
 
 func CreateTCPServer() (*TCPServer) {
@@ -103,6 +111,9 @@ func (receiver *TCPServer) ServeWithoutListener() (error) {
     receiver.isClosed = false
     receiver.controllers = containers.NewSync()
 
+    //只有实际服务器才有下发需求，才需要初始化发送队列
+    receiver.sendChan = make(chan TCPSend, 10240)
+
     utils.LogInfo("### 无监听服务启动成功")
 
     return nil
@@ -116,12 +127,12 @@ func (receiver *TCPServer) delController(controller Controller) {
 	receiver.controllers.Pop(controller.GetSessionID())
 }
 
-func (receiver *TCPServer) getController(sessid SessionID) Controller {
+func (receiver *TCPServer) getController(sessid SessionID) *TCPController {
 	v := receiver.controllers.Get(sessid)
 	if v == nil {
 		return nil
 	}
-	ctrl, ok := v.(Controller)
+	ctrl, ok := v.(*TCPController)
 	if ok {
 		return ctrl
 	}
@@ -196,6 +207,12 @@ func (receiver *TCPServer) processClient(conn net.Conn) {
 
 func (receiver *TCPServer) goroutineAccept() {
 	defer utils.LogPanic(recover())
+
+    if receiver.OnConnectAccepted == nil {
+        //只有实际服务器才有下发需求，才需要初始化发送队列
+        receiver.sendChan = make(chan TCPSend, 10240)
+    }
+
 	for {
 		conn, err := receiver.listener.Accept()
 		if err != nil {
@@ -228,6 +245,37 @@ func (receiver *TCPServer) Close() {
 	}
 }
 
+func (receiver *TCPServer) goroutineSend() {
+    defer utils.LogPanic(recover())
+
+    for !receiver.isClosed {
+        ts, ok := <-receiver.sendChan
+        if ok {
+            if ts.sessionId > 0 {
+                ctrl := receiver.getController(ts.sessionId)
+                if ctrl != nil {
+                    ctrl.RawSend(ts.data)
+                }
+            } else {
+                // TODO: !!!此处或许会有严重BUG，因为这一部分使用了同步加锁字典容器的迭代器进行遍历
+                // TODO: 可能在客户端连接关闭而导致其从容器中删除时同时被迭代
+                for v := range receiver.controllers.IterItems() {
+                    if v.Value == nil {
+                        continue
+                    }
+                    ctrl, ok := v.Value.(*TCPController)
+                    if ok {
+                        ctrl.RawSend(ts.data)
+                    }
+                }
+            }
+        } else {
+            //下发队列已销毁,退出发送处理
+            break
+        }
+    }
+}
+
 func (receiver *TCPServer) Schedule() {
 	go receiver.goroutineAccept()
 }
@@ -247,7 +295,7 @@ func (receiver *TCPServer) closeAllController(msg ...codecs.IMData) {
 	}
 }
 
-func (receiver *TCPServer) CloseController(sessionid SessionID) (error) {
+func (receiver *TCPServer) CloseController(sessionid SessionID) error {
 	processor := receiver.getController(sessionid)
 	if processor == nil {
 		return errors.ErrorSessionIsNotExists
@@ -257,27 +305,43 @@ func (receiver *TCPServer) CloseController(sessionid SessionID) (error) {
 }
 
 
-func (receiver *TCPServer) Send(sessionid SessionID,msg ...codecs.IMData) ([]codecs.IMData, error) {
+func (receiver *TCPServer) Send(sessionid SessionID, data []byte) error {
 	if receiver.isClosed {
-		return msg, errors.ErrorSessionIsNotExists
+		return errors.ErrorSessionIsNotExists
 	}
-	processor := receiver.getController(sessionid)
+	/*processor := receiver.getController(sessionid)
 	if processor == nil {
 		return msg, errors.ErrorSessionIsNotExists
 	}
 	return processor.Send(msg...)
+	*/
+	ts := TCPSend{sessionId:sessionid, data:data}
+	go func() {
+	    receiver.sendChan <- ts
+    }()
+
+    return nil
 }
 
 func (receiver *TCPServer) Mutilcast(sessionids []SessionID,msg ...codecs.IMData) {
 	if receiver.isClosed {
 		return
 	}
+
+    dr := createDataReadWriter(receiver.Codec, receiver.Format)
+    st := time.Now().UnixNano()
+    buf, _, err := dr.PackDatagram(nil, msg...)
+    IncEncodeTime(time.Now().UnixNano() - st)
+    if err != nil {
+        return
+    }
+
 	for _, sessionid := range sessionids {
 		controller := receiver.getController(sessionid)
 		if controller == nil {
 			continue
 		}
-		controller.Send(msg...)
+		receiver.Send(sessionid, buf)
 	}
 }
 
@@ -285,6 +349,18 @@ func (receiver *TCPServer) Boardcast(msg ...codecs.IMData) {
 	if receiver.isClosed {
 		return
 	}
+
+	dr := createDataReadWriter(receiver.Codec, receiver.Format)
+    st := time.Now().UnixNano()
+    buf, _, err := dr.PackDatagram(nil, msg...)
+    IncEncodeTime(time.Now().UnixNano() - st)
+    if err != nil {
+        return
+    }
+
+    receiver.Send(0, buf)
+
+    /*
 	for v := range receiver.controllers.IterItems() {
 		if v.Value == nil {
 			continue
@@ -293,5 +369,5 @@ func (receiver *TCPServer) Boardcast(msg ...codecs.IMData) {
 		if ok {
 			controller.Send(msg...)
 		}
-	}
+	}*/
 }
