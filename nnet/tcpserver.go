@@ -277,6 +277,7 @@ func (receiver *TCPServer) goroutineSend() {
 
 func (receiver *TCPServer) Schedule() {
 	go receiver.goroutineAccept()
+    go receiver.goroutineSend()
 }
 
 func (receiver *TCPServer) closeAllController(msg ...codecs.IMData) {
