@@ -113,6 +113,7 @@ func (receiver *TCPServer) ServeWithoutListener() (error) {
     //只有实际服务器才有下发需求，才需要初始化发送队列
     receiver.sendChan = make(chan TCPSend, 10240)
 
+	go receiver.goroutineSend()
     utils.LogInfo("### 无监听服务启动成功")
 
     return nil
@@ -273,6 +274,7 @@ func (receiver *TCPServer) goroutineSend() {
             break
         }
     }
+    close(receiver.sendChan)
 }
 
 func (receiver *TCPServer) Schedule() {

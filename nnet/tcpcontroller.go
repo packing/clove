@@ -94,6 +94,10 @@ func (receiver *TCPController) Close() {
 		utils.LogPanic(recover())
 	}()
 	receiver.closeSendReq = true
+	if receiver.sendCh != nil {
+		close(receiver.sendCh)
+		receiver.sendCh = nil
+	}
 	receiver.ioinner.Close()
 }
 
@@ -279,7 +283,6 @@ func (receiver *TCPController) Schedule() {
 		if receiver.OnStop != nil {
 			receiver.OnStop(receiver)
 		}
-		close(receiver.sendCh)
 		utils.LogVerbose(">>> TCP控制器 %s 已关闭调度", receiver.GetSource())
 	}()
 }
