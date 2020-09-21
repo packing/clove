@@ -47,6 +47,7 @@ type TCPController struct {
 	sendCh     chan int
 	closeOnSended bool
 	closeSendReq bool
+	scheduleClosed bool
 	associatedObject interface{}
 	tag         int
 }
@@ -60,19 +61,10 @@ func createTCPController(ioSrc net.Conn, dataRW *DataReadWriter) *TCPController 
 	sor.source = ioSrc.RemoteAddr().String()
 	sor.id = NewSessionID()
 	sor.closeOnSended = false
+	sor.scheduleClosed = true
 	sor.associatedObject = nil
 
-	runtime.SetFinalizer(sor, func(willDispose *TCPController) {
-        willDispose.FreeChan()
-    })
 	return sor
-}
-
-func (receiver *TCPController) FreeChan() {
-    if receiver.sendCh != nil {
-        close(receiver.sendCh)
-        receiver.sendCh = nil
-    }
 }
 
 func (receiver *TCPController) SetAssociatedObject(o interface{}) {
@@ -129,9 +121,10 @@ func (receiver *TCPController) Write(data []byte) {
     }
 	receiver.sendBuffer.Write(data)
 
+	/*
 	go func() {
 	    receiver.sendCh <- 1
-	}()
+	}()*/
 }
 
 func (receiver *TCPController) Send(msg ...codecs.IMData) ([]codecs.IMData, error) {
@@ -212,7 +205,6 @@ func (receiver *TCPController) processRead(wg *sync.WaitGroup) {
 	}
 
 	utils.LogVerbose(">>> 连接 %s 停止处理I/O读取", receiver.GetSource())
-	receiver.closeSendReq = true
 }
 
 func (receiver *TCPController) processWrite(wg *sync.WaitGroup) {
@@ -223,8 +215,7 @@ func (receiver *TCPController) processWrite(wg *sync.WaitGroup) {
 
 mainsend:	for {
 		_, ok := <- receiver.sendCh
-		if ok {
-			//var repeat = 0
+		if ok && !receiver.closeSendReq {
 			buf := make([]byte, sendbufferSize)
 			sendBuffLen, _ := receiver.sendBuffer.Read(buf)
 			for sendBuffLen > 0 {
@@ -244,53 +235,44 @@ mainsend:	for {
 					continue
 				}
 				if sendErr != nil {
-                    //if strings.Contains(sendErr.Error(), "use of closed network connection") {
-						//break
-                    //}
-                    //if strings.Contains(sendErr.Error(), "connection reset by peer") {
-                    //    break
-                    //}
-                    //if strings.Contains(sendErr.Error(), "broken pipe") {
-                    //    break
-                    //}
-					/*if repeat < 1 {
-						utils.LogError(">>> 连接 %s 发送数据超时或异常,重试", receiver.GetSource(), sendErr)
-						utils.LogError(sendErr.Error())
-						time.Sleep(500 * time.Microsecond)
-						runtime.Gosched()
-						repeat += 1
-						continue
-					} else {*/
-						utils.LogError(">>> 连接 %s 发送数据超时或异常，关闭连接", receiver.GetSource())
-						utils.LogError(sendErr.Error())
-						receiver.Close()
+                    utils.LogError(">>> 连接 %s 发送数据超时或异常，关闭连接", receiver.GetSource())
+                    utils.LogError(sendErr.Error())
+                    receiver.Close()
                     break mainsend
-					//}
 				}
 				break
 			}
 		} else {
-			//utils.LogError(">>> 因连接 %s 关闭，退出数据发送处理", receiver.GetSource())
-			break
+		    if !ok {
+		        //channel意外关闭了，退出
+		        break
+            }
+			if receiver.scheduleClosed {
+                //辅助唤醒协程已经退出了，那自己可以退出了
+			    break
+            }
 		}
 	}
 
-    receiver.closeSendReq = true
 	utils.LogVerbose(">>> 连接 %s 停止处理I/O发送", receiver.GetSource())
 }
 
 func (receiver *TCPController) processSchedule(wg *sync.WaitGroup) {
+    receiver.scheduleClosed = false
 	defer func() {
 		wg.Done()
 		//utils.LogPanic()
 	}()
 	for {
         if receiver.closeSendReq {
+            receiver.scheduleClosed = true
             return
         }
 		receiver.sendCh <- 1
-		time.Sleep(1 * time.Second)
+		time.Sleep(1 * time.Millisecond)
+		runtime.Gosched()
 	}
+    utils.LogVerbose(">>> 连接 %s 停止辅助唤醒", receiver.GetSource())
 }
 
 func (receiver *TCPController) Schedule() {
@@ -307,6 +289,7 @@ func (receiver *TCPController) Schedule() {
 		if receiver.OnStop != nil {
 			receiver.OnStop(receiver)
 		}
+		close(receiver.sendCh)
 		utils.LogVerbose(">>> TCP控制器 %s 已关闭调度", receiver.GetSource())
 	}()
 }
