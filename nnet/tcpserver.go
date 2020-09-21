@@ -37,7 +37,7 @@ goroutine 2 => process data unpack/decode/logic-make/encode/pack
 
 type TCPSend struct {
     sessionId SessionID
-    data    []byte
+    msgs    []codecs.IMData
 }
 
 type TCPServer struct {
@@ -254,7 +254,7 @@ func (receiver *TCPServer) goroutineSend() {
             if ts.sessionId > 0 {
                 ctrl := receiver.getController(ts.sessionId)
                 if ctrl != nil {
-                    ctrl.RawSend(ts.data)
+                    ctrl.RawSend(ts.msgs...)
                 }
             } else {
                 // TODO: !!!此处或许会有严重BUG，因为这一部分使用了同步加锁字典容器的迭代器进行遍历
@@ -265,7 +265,7 @@ func (receiver *TCPServer) goroutineSend() {
                     }
                     ctrl, ok := v.Value.(*TCPController)
                     if ok {
-                        ctrl.RawSend(ts.data)
+                        ctrl.RawSend(ts.msgs...)
                     }
                 }
             }
@@ -310,29 +310,12 @@ func (receiver *TCPServer) Send(sessionid SessionID, msg ...codecs.IMData) ([]co
 		return msg, errors.ErrorSessionIsNotExists
 	}
 
-    dr := createDataReadWriter(receiver.Codec, receiver.Format)
-    st := time.Now().UnixNano()
-    buf, rm, err := dr.PackDatagram(nil, msg...)
-    IncEncodeTime(time.Now().UnixNano() - st)
-    if err != nil {
-        return msg, errors.ErrorDataNotReady
-    }
-
-    receiver.RawSend(sessionid, buf)
-    return rm, err
-}
-
-
-func (receiver *TCPServer) RawSend(sessionid SessionID, data []byte) error {
-    if receiver.isClosed {
-        return errors.ErrorSessionIsNotExists
-    }
-    ts := TCPSend{sessionId:sessionid, data:data}
+    ts := TCPSend{sessionId:sessionid, msgs: msg}
     go func() {
         receiver.sendChan <- ts
     }()
 
-    return nil
+    return []codecs.IMData{}, nil
 }
 
 func (receiver *TCPServer) Mutilcast(sessionids []SessionID,msg ...codecs.IMData) {
@@ -340,20 +323,12 @@ func (receiver *TCPServer) Mutilcast(sessionids []SessionID,msg ...codecs.IMData
 		return
 	}
 
-    dr := createDataReadWriter(receiver.Codec, receiver.Format)
-    st := time.Now().UnixNano()
-    buf, _, err := dr.PackDatagram(nil, msg...)
-    IncEncodeTime(time.Now().UnixNano() - st)
-    if err != nil {
-        return
-    }
-
 	for _, sessionid := range sessionids {
 		controller := receiver.getController(sessionid)
 		if controller == nil {
 			continue
 		}
-		receiver.RawSend(sessionid, buf)
+		receiver.Send(sessionid, msg...)
 	}
 }
 
@@ -362,15 +337,7 @@ func (receiver *TCPServer) Boardcast(msg ...codecs.IMData) {
 		return
 	}
 
-	dr := createDataReadWriter(receiver.Codec, receiver.Format)
-    st := time.Now().UnixNano()
-    buf, _, err := dr.PackDatagram(nil, msg...)
-    IncEncodeTime(time.Now().UnixNano() - st)
-    if err != nil {
-        return
-    }
-
-    receiver.RawSend(0, buf)
+    receiver.Send(0, msg...)
 
     /*
 	for v := range receiver.controllers.IterItems() {

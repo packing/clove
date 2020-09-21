@@ -138,17 +138,22 @@ func (receiver *TCPController) Send(msg ...codecs.IMData) ([]codecs.IMData, erro
 	return remainMsgs, err
 }
 
-func (receiver *TCPController) RawSend(data []byte) error {
+func (receiver *TCPController) RawSend(msg ...codecs.IMData) error {
     //utils.LogVerbose(">>> 连接 %s 发送客户端消息", receiver.GetSource())
     if receiver.closeSendReq {
         return errors.ErrorRemoteReqClose
     }
-    receiver.ioinner.SetWriteDeadline(time.Now().Add(3 * time.Second))
-    _, sendErr := receiver.ioinner.Write(data)
-    if sendErr == nil {
-        IncTotalTcpSendSize(len(data))
-    } else {
-        return sendErr
+    st := time.Now().UnixNano()
+    buf, _, err := receiver.DataRW.PackStream(receiver, msg...)
+    IncEncodeTime(time.Now().UnixNano() - st)
+    if err == nil {
+        receiver.ioinner.SetWriteDeadline(time.Now().Add(3 * time.Second))
+        _, sendErr := receiver.ioinner.Write(buf)
+        if sendErr == nil {
+            IncTotalTcpSendSize(len(buf))
+        } else {
+            return sendErr
+        }
     }
     return nil
 }
