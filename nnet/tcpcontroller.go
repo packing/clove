@@ -25,6 +25,7 @@ import (
 	"time"
     "runtime"
     "github.com/packing/nbpy/errors"
+    "fmt"
 )
 
 /*
@@ -61,7 +62,18 @@ func createTCPController(ioSrc net.Conn, dataRW *DataReadWriter) *TCPController 
 	sor.id = NewSessionID()
 	sor.closeOnSended = false
 	sor.associatedObject = nil
+
+	runtime.SetFinalizer(sor, func(willDispose *TCPController) {
+        willDispose.FreeChan()
+    })
 	return sor
+}
+
+func (receiver *TCPController) FreeChan() {
+    if receiver.sendCh != nil {
+        close(receiver.sendCh)
+        receiver.sendCh = nil
+    }
 }
 
 func (receiver *TCPController) SetAssociatedObject(o interface{}) {
@@ -94,11 +106,6 @@ func (receiver *TCPController) Close() {
 	}()
 	receiver.closeSendReq = true
 	receiver.ioinner.Close()
-	//if receiver.closeCh != nil {
-	//	close(receiver.closeCh)
-	//	receiver.closeCh = nil
-	//}
-	//go func() { receiver.closeCh <- 1 }()
 }
 
 func (receiver *TCPController) Discard() {
@@ -124,9 +131,6 @@ func (receiver *TCPController) Write(data []byte) {
 	receiver.sendBuffer.Write(data)
 
 	go func() {
-        if receiver.closeSendReq {
-            return
-        }
 	    receiver.sendCh <- 1
 	}()
 }
@@ -292,7 +296,6 @@ func (receiver *TCPController) processSchedule(wg *sync.WaitGroup) {
 
 func (receiver *TCPController) Schedule() {
 	receiver.runableData = make(chan int, 10240)
-	//receiver.closeCh = make(chan int)
 	receiver.sendCh = make(chan int)
 	wg := new(sync.WaitGroup)
 	wg.Add(4)
@@ -304,10 +307,6 @@ func (receiver *TCPController) Schedule() {
 		wg.Wait()
 		if receiver.OnStop != nil {
 			receiver.OnStop(receiver)
-		}
-		if receiver.sendCh != nil {
-			close(receiver.sendCh)
-			receiver.sendCh = nil
 		}
 		utils.LogVerbose(">>> TCP控制器 %s 已关闭调度", receiver.GetSource())
 	}()
