@@ -42,14 +42,14 @@ type Client struct {
     unixMode   bool
     lock       sync.Mutex
     timeOut    time.Duration
-    waiters    map[int64] ResultWaiter
+    waiters    *sync.Map
     uniqueId   int64
 }
 
 func CreateClient(addr string, timeOut time.Duration) (*Client) {
     kv := new(Client)
     kv.timeOut = timeOut
-    kv.waiters = make(map[int64] ResultWaiter)
+    kv.waiters = new(sync.Map)
     if err := kv.Initialize(addr); err != nil {
         utils.LogError("CreateClient error: %s", err.Error())
         return nil
@@ -58,11 +58,14 @@ func CreateClient(addr string, timeOut time.Duration) (*Client) {
 }
 
 func (receiver *Client) Close() {
-    receiver.lock.Lock()
-    defer receiver.lock.Unlock()
-    for _, v := range receiver.waiters {
-        close(v.ch)
-    }
+    receiver.waiters.Range(func(key, value interface{}) bool {
+        v, ok := value.(ResultWaiter)
+        if ok {
+            close(v.ch)
+        }
+        return true
+    })
+
     if receiver.udpUnix != nil {
         receiver.udpUnix.Close()
     }
@@ -82,37 +85,37 @@ func (receiver *Client) makeCmdId(cmdId *int64) {
 }
 
 func (receiver *Client) addWaiter(waiter ResultWaiter) {
-    receiver.lock.Lock()
-    defer receiver.lock.Unlock()
-    receiver.waiters[waiter.id] = waiter
+    receiver.waiters.Store(waiter.id, waiter)
 }
 
 func (receiver *Client) delWaiter(cmdId int64, fn func(*ResultWaiter)) {
-    receiver.lock.Lock()
-    defer receiver.lock.Unlock()
-    w, ok := receiver.waiters[cmdId]
+    w, ok := receiver.waiters.Load(cmdId)
     if fn != nil {
         if ok {
-            fn(&w)
-        } else {
-            fn(nil)
+            v, ok := w.(ResultWaiter)
+            if ok {
+                fn(&v)
+            } else {
+                fn(nil)
+            }
         }
     }
     if ok {
-        delete(receiver.waiters, cmdId)
+        receiver.waiters.Delete(cmdId)
     }
 }
 
 func (receiver *Client) execWaiter(cmdId int64,fn func(*ResultWaiter)) bool {
-    receiver.lock.Lock()
-    defer receiver.lock.Unlock()
-    w, ok := receiver.waiters[cmdId]
+    w, ok := receiver.waiters.Load(cmdId)
     if ok {
-        fn(&w)
-    } else {
-        fn(nil)
+        v, ok := w.(ResultWaiter)
+        if ok {
+            fn(&v)
+        } else {
+            fn(nil)
+        }
     }
-    return ok
+    return true
 }
 
 func (receiver *Client) onKeyValueMsgRet(controller nnet.Controller, _ string, msg codecs.IMData) error {
