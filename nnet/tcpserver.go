@@ -25,8 +25,9 @@ import (
 	"github.com/packing/nbpy/codecs"
 	"github.com/packing/nbpy/packets"
 	"github.com/packing/nbpy/errors"
-	"github.com/packing/nbpy/containers"
     "os"
+	"sync/atomic"
+	"sync"
 )
 
 /*
@@ -44,16 +45,17 @@ type TCPServer struct {
 	SocketController
 	Codec          *codecs.Codec
 	Format         *packets.PacketFormat
-	limit          int
-	total          int
+	limit          int64
+	total          int64
 	listener       *net.TCPListener
-	controllers    containers.SyncDict
+	controllers    *sync.Map
 	isClosed       bool
 	handleTransfer *UnixMsg
 	handleReceiveAddr string
 	OnConnectAccepted func(conn net.Conn) error
-
-	sendChan        chan TCPSend
+	ControllerCome OnControllerCome
+	sendChan        chan *TCPSend
+	mutex 			sync.Mutex
 }
 
 func CreateTCPServer() (*TCPServer) {
@@ -62,7 +64,7 @@ func CreateTCPServer() (*TCPServer) {
 	return srv
 }
 
-func CreateTCPServerWithLimit(limit int) (*TCPServer) {
+func CreateTCPServerWithLimit(limit int64) (*TCPServer) {
 	srv := CreateTCPServer()
 	srv.limit = limit
 	srv.isClosed = true
@@ -75,7 +77,12 @@ func (receiver *TCPServer) SetHandleTransfer(dest string, transfer *UnixMsg) {
 }
 
 func (receiver *TCPServer) GetTotal() int {
-    return receiver.controllers.Count()
+    var i = 0
+    receiver.controllers.Range(func(key, value interface{}) bool {
+        i += 1
+        return true
+    })
+    return i
 }
 
 func (receiver TCPServer) OnFileHandleReceived(fd int) error {
@@ -99,7 +106,7 @@ func (receiver *TCPServer) Bind(addr string, port int) (error) {
 	}
 
 	receiver.isClosed = false
-	receiver.controllers = containers.NewSync()
+	receiver.controllers = new(sync.Map)
 
 	utils.LogInfo("### 监听 %s 成功", address)
 
@@ -108,10 +115,10 @@ func (receiver *TCPServer) Bind(addr string, port int) (error) {
 
 func (receiver *TCPServer) ServeWithoutListener() (error) {
     receiver.isClosed = false
-    receiver.controllers = containers.NewSync()
+	receiver.controllers = new(sync.Map)
 
     //只有实际服务器才有下发需求，才需要初始化发送队列
-    receiver.sendChan = make(chan TCPSend, 10240)
+    receiver.sendChan = make(chan *TCPSend, 128)
 
 	go receiver.goroutineSend()
     utils.LogInfo("### 无监听服务启动成功")
@@ -120,23 +127,38 @@ func (receiver *TCPServer) ServeWithoutListener() (error) {
 }
 
 func (receiver *TCPServer) addController(controller *TCPController) {
-	receiver.controllers.Set(controller.GetSessionID(),controller)
+	receiver.controllers.Store(controller.GetSessionID(), controller)
 }
 
 func (receiver *TCPServer) delController(controller Controller) {
-	receiver.controllers.Pop(controller.GetSessionID())
+	receiver.controllers.Delete(controller.GetSessionID())
 }
 
 func (receiver *TCPServer) getController(sessid SessionID) *TCPController {
-	v := receiver.controllers.Get(sessid)
-	if v == nil {
+	v, ok := receiver.controllers.Load(sessid)
+	if !ok {
 		return nil
 	}
-	ctrl, ok := v.(*TCPController)
-	if ok {
-		return ctrl
+	conn, ok := v.(*TCPController)
+	if !ok {
+		return nil
 	}
-	return nil
+	return conn
+}
+
+func (receiver *TCPServer) eachControllers(fn func(*TCPController)) {
+	receiver.controllers.Range(func(key, value interface{}) bool {
+		conn, ok := value.(*TCPController)
+		if !ok {
+			return false
+		}
+		fn(conn)
+		return true
+	})
+}
+
+func (receiver TCPServer) GetController(sessid SessionID) *TCPController {
+	return receiver.getController(sessid)
 }
 
 func (receiver *TCPServer) processClientFromFileHandle(fd int) error {
@@ -150,7 +172,7 @@ func (receiver *TCPServer) processClientFromFileHandle(fd int) error {
         return err
     }
 
-    receiver.total += 1
+	atomic.AddInt64(&receiver.total, 1)
 
     dataRW := createDataReadWriter(receiver.Codec, receiver.Format)
     dataRW.OnDataDecoded = receiver.OnDataDecoded
@@ -160,10 +182,17 @@ func (receiver *TCPServer) processClientFromFileHandle(fd int) error {
         if receiver.OnBye != nil {
             receiver.OnBye(controller)
         }
-        receiver.total -= 1
+		atomic.AddInt64(&receiver.total, -1)
         receiver.delController(controller)
         return nil
     }
+
+    if receiver.ControllerCome != nil {
+    	if err = receiver.ControllerCome(controller); err != nil {
+			atomic.AddInt64(&receiver.total, -1)
+			return err
+		}
+	}
 
     receiver.addController(controller)
 
@@ -181,7 +210,7 @@ func (receiver *TCPServer) processClient(conn net.Conn) {
 		conn.Close()
 		return
 	}
-	receiver.total += 1
+	atomic.AddInt64(&receiver.total, 1)
 
 	dataRW := createDataReadWriter(receiver.Codec, receiver.Format)
 	dataRW.OnDataDecoded = receiver.OnDataDecoded
@@ -191,9 +220,16 @@ func (receiver *TCPServer) processClient(conn net.Conn) {
 		if receiver.OnBye != nil {
 			receiver.OnBye(controller)
 		}
-		receiver.total -= 1
+		atomic.AddInt64(&receiver.total, -1)
 		receiver.delController(controller)
 		return nil
+	}
+
+	if receiver.ControllerCome != nil {
+		if err := receiver.ControllerCome(controller); err != nil {
+			atomic.AddInt64(&receiver.total, -1)
+			return
+		}
 	}
 
 	receiver.addController(controller)
@@ -210,7 +246,7 @@ func (receiver *TCPServer) goroutineAccept() {
 
     if receiver.OnConnectAccepted == nil {
         //只有实际服务器才有下发需求，才需要初始化发送队列
-        receiver.sendChan = make(chan TCPSend, 10240)
+        receiver.sendChan = make(chan *TCPSend, 128)
     }
 
 	for {
@@ -249,7 +285,7 @@ func (receiver *TCPServer) goroutineSend() {
     defer utils.LogPanic(recover())
 
     for !receiver.isClosed {
-        ts, ok := <-receiver.sendChan
+        ts, ok := <- receiver.sendChan
         if ok {
             if ts.sessionId > 0 {
                 ctrl := receiver.getController(ts.sessionId)
@@ -257,17 +293,9 @@ func (receiver *TCPServer) goroutineSend() {
                     ctrl.RawSend(ts.msgs...)
                 }
             } else {
-                // TODO: !!!此处或许会有严重BUG，因为这一部分使用了同步加锁字典容器的迭代器进行遍历
-                // TODO: 可能在客户端连接关闭而导致其从容器中删除时同时被迭代
-                for v := range receiver.controllers.IterItems() {
-                    if v.Value == nil {
-                        continue
-                    }
-                    ctrl, ok := v.Value.(*TCPController)
-                    if ok {
-                        ctrl.RawSend(ts.msgs...)
-                    }
-                }
+            	receiver.eachControllers(func(controller *TCPController) {
+					controller.RawSend(ts.msgs...)
+				})
             }
         } else {
             //下发队列已销毁,退出发送处理
@@ -286,15 +314,9 @@ func (receiver *TCPServer) closeAllController(msg ...codecs.IMData) {
 	if receiver.isClosed {
 		return
 	}
-	for _, v := range receiver.controllers.Items() {
-		if v.Value == nil {
-			continue
-		}
-		controller, ok := v.Value.(Controller)
-		if ok {
-			controller.Close()
-		}
-	}
+	receiver.eachControllers(func(controller *TCPController) {
+		controller.Close()
+	})
 }
 
 func (receiver *TCPServer) CloseController(sessionid SessionID) error {
@@ -311,10 +333,9 @@ func (receiver *TCPServer) Send(sessionid SessionID, msg ...codecs.IMData) ([]co
 	if receiver.isClosed {
 		return msg, errors.ErrorSessionIsNotExists
 	}
-
     ts := TCPSend{sessionId:sessionid, msgs: msg}
     go func() {
-        receiver.sendChan <- ts
+        receiver.sendChan <- &ts
     }()
 
     return []codecs.IMData{}, nil
@@ -340,15 +361,4 @@ func (receiver *TCPServer) Boardcast(msg ...codecs.IMData) {
 	}
 
     receiver.Send(0, msg...)
-
-    /*
-	for v := range receiver.controllers.IterItems() {
-		if v.Value == nil {
-			continue
-		}
-		controller, ok := v.Value.(Controller)
-		if ok {
-			controller.Send(msg...)
-		}
-	}*/
 }

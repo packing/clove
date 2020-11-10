@@ -146,5 +146,5 @@ func (receiver PacketPackagerNB) Package(pck *Packet, raw []byte) (error, []byte
 	return nil, bytes.Join([][]byte{header, raw}, []byte(""))
 }
 
-var packetFormatNB = PacketFormat{Tag: "NBPyPacket", Priority:-998, Parser: PacketParserNB{}, Packager: PacketPackagerNB{}}
+var packetFormatNB = PacketFormat{Tag: "NBPyPacket", Priority:-998, UnixNeed:true, Parser: PacketParserNB{}, Packager: PacketPackagerNB{}}
 var PacketFormatNB = &packetFormatNB

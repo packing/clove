@@ -41,21 +41,49 @@ const (
 	ProtocolKeyUnixMsgAddr 	= 0x25
 	ProtocolKeyLocalHost 	= 0x26
 
-	ProtocolTypeDeliver 	= 0x01
-	ProtocolTypeHeart 		= 0x02
-	ProtocolTypeClientLeave = 0x03
-	ProtocolTypeSlaveHello 	= 0x04
-	ProtocolTypeAdapterHello= 0x05
-	ProtocolTypeGatewayHello= 0x06
-	ProtocolTypeKillClient	= 0x07
-	ProtocolTypeAdapters	= 0x08
-	ProtocolTypeSlaves		= 0x09
-	ProtocolTypeSlaveCome	= 0x10
-	ProtocolTypeSlaveBye	= 0x11
-	ProtocolTypeAdapterCome	= 0x12
-	ProtocolTypeAdapterBye	= 0x13
+	ProtocolKeySQL 			= 0x27
+	ProtocolKeyArgs 		= 0x28
+	ProtocolKeyActions 		= 0x29
+	ProtocolKeyCmd 			= 0x30
+	ProtocolKeyResult 		= 0x31
+
+	ProtocolKeySidForLock 		= 0x88
+	ProtocolKeyKeyForLock 		= 0x89
+	ProtocolKeyKeyForRedis 		= 0x90
+
+	ProtocolTypeDeliver 		= 0x01
+	ProtocolTypeHeart 			= 0x02
+	ProtocolTypeClientLeave 	= 0x03
+	ProtocolTypeSlaveHello 		= 0x04
+	ProtocolTypeAdapterHello	= 0x05
+	ProtocolTypeGatewayHello	= 0x06
+	ProtocolTypeKillClient		= 0x07
+	ProtocolTypeAdapters		= 0x08
+	ProtocolTypeSlaves			= 0x09
+	ProtocolTypeSlaveCome		= 0x10
+	ProtocolTypeSlaveBye		= 0x11
+	ProtocolTypeAdapterCome		= 0x12
+	ProtocolTypeAdapterBye		= 0x13
 	ProtocolTypeAdapterChange	= 0x14
 	ProtocolTypeSlaveChange		= 0x15
+	ProtocolTypeClientEnter 	= 0x16
+
+	ProtocolTypeDBQuery			= 0x17
+	ProtocolTypeDBExec			= 0x18
+	ProtocolTypeDBTransaction	= 0x19
+	ProtocolTypeRedisOpen		= 0x20
+	ProtocolTypeRedisClose 		= 0x21
+	ProtocolTypeRedisDo 		= 0x22
+	ProtocolTypeRedisSend 		= 0x23
+	ProtocolTypeRedisFlush 		= 0x24
+	ProtocolTypeRedisReceive 	= 0x25
+
+	ProtocolTypeInitLockKey		= 0x86
+	ProtocolTypeDisposeLockKey	= 0x87
+	ProtocolTypeLockKey			= 0x88
+	ProtocolTypeUnLockKey		= 0x89
+
+	ProtocolTypeFlowReturn		= 0x99
 
     ProtocolTagMaster 		= 0x0
 	ProtocolTagSlave 		= 0x01

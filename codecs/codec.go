@@ -221,20 +221,38 @@ func (receiver IMMapReader) IntValueOf(key interface{}, def int64) int64 {
 	if v == nil {
 		return def
 	}
-	kind := reflect.TypeOf(v).Kind()
-	switch kind {
-	case reflect.Int: fallthrough
-	case reflect.Int8: fallthrough
-	case reflect.Int16: fallthrough
-	case reflect.Int32: fallthrough
-	case reflect.Int64:
-		return reflect.ValueOf(v).Int()
-	case reflect.Uint: fallthrough
-	case reflect.Uint8: fallthrough
-	case reflect.Uint16: fallthrough
-	case reflect.Uint32: fallthrough
-	case reflect.Uint64:
-		return int64(reflect.ValueOf(v).Uint())
+	switch v.(type) {
+	case int: return int64(v.(int))
+	case int8: return int64(v.(int8))
+	case int16: return int64(v.(int16))
+	case int32: return int64(v.(int32))
+	case uint64: return int64(v.(uint64))
+	case uint: return int64(v.(uint))
+	case uint8: return int64(v.(uint8))
+	case uint16: return int64(v.(uint16))
+	case uint32: return int64(v.(uint32))
+	case int64: return v.(int64)
+	default:
+		return def
+	}
+}
+
+func (receiver IMMapReader) UintValueOf(key interface{}, def uint64) uint64 {
+	v := receiver.TryReadValue(key)
+	if v == nil {
+		return def
+	}
+	switch v.(type) {
+	case int: return uint64(v.(int))
+	case int8: return uint64(v.(int8))
+	case int16: return uint64(v.(int16))
+	case int32: return uint64(v.(int32))
+	case int64: return uint64(v.(int64))
+	case uint: return uint64(v.(uint))
+	case uint8: return uint64(v.(uint8))
+	case uint16: return uint64(v.(uint16))
+	case uint32: return uint64(v.(uint32))
+	case uint64: return v.(uint64)
 	default:
 		return def
 	}
@@ -291,21 +309,41 @@ func (receiver IMSliceReader) IntValueOf(index int, def int64) int64 {
 	if v == nil {
 		return def
 	}
+	switch v.(type) {
+	case int: return int64(v.(int))
+	case int8: return int64(v.(int8))
+	case int16: return int64(v.(int16))
+	case int32: return int64(v.(int32))
+	case uint64: return int64(v.(uint64))
+	case uint: return int64(v.(uint))
+	case uint8: return int64(v.(uint8))
+	case uint16: return int64(v.(uint16))
+	case uint32: return int64(v.(uint32))
+	case int64: return v.(int64)
+	default:
+		return def
+	}
+}
 
-	kind := reflect.TypeOf(v).Kind()
-	switch kind {
-	case reflect.Int: fallthrough
-	case reflect.Int8: fallthrough
-	case reflect.Int16: fallthrough
-	case reflect.Int32: fallthrough
-	case reflect.Int64:
-		return reflect.ValueOf(v).Int()
-	case reflect.Uint: fallthrough
-	case reflect.Uint8: fallthrough
-	case reflect.Uint16: fallthrough
-	case reflect.Uint32: fallthrough
-	case reflect.Uint64:
-		return int64(reflect.ValueOf(v).Uint())
+func (receiver IMSliceReader) UintValueOf(index int, def uint64) uint64 {
+	if index >= len(receiver.List) || index < 0 {
+		return def
+	}
+	v := receiver.List[index]
+	if v == nil {
+		return def
+	}
+	switch v.(type) {
+	case int: return uint64(v.(int))
+	case int8: return uint64(v.(int8))
+	case int16: return uint64(v.(int16))
+	case int32: return uint64(v.(int32))
+	case int64: return uint64(v.(int64))
+	case uint: return uint64(v.(uint))
+	case uint8: return uint64(v.(uint8))
+	case uint16: return uint64(v.(uint16))
+	case uint32: return uint64(v.(uint32))
+	case uint64: return v.(uint64)
 	default:
 		return def
 	}
@@ -374,6 +412,23 @@ func Int64FromInterface(v interface{}) int64 {
 	case uint16: rv = int64(v.(uint16))
 	case uint32: rv = int64(v.(uint32))
 	case uint64: rv = int64(v.(uint64))
+	}
+	return rv
+}
+
+func Uint64FromInterface(v interface{}) uint64 {
+	var rv uint64 = 0
+	switch v.(type) {
+	case int: rv = uint64(v.(int))
+	case int8: rv = uint64(v.(int8))
+	case int16: rv = uint64(v.(int16))
+	case int32: rv = uint64(v.(int32))
+	case int64: rv = uint64(v.(int64))
+	case uint: rv = uint64(v.(uint))
+	case uint8: rv = uint64(v.(uint8))
+	case uint16: rv = uint64(v.(uint16))
+	case uint32: rv = uint64(v.(uint32))
+	case uint64: rv = uint64(v.(uint64))
 	}
 	return rv
 }

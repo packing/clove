@@ -146,6 +146,14 @@ func (receiver Message) GetSrcData() (codecs.IMData) {
     return receiver.messageSrcData
 }
 
+func (receiver *Message) SetSearial(searial int64) {
+	receiver.messageSerial = searial
+}
+
+func (receiver Message) GetSearial() (int64) {
+	return receiver.messageSerial
+}
+
 func (receiver *Message) SetErrorCode(code int) {
 	receiver.messageErrorCode = code
 }

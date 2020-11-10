@@ -20,7 +20,7 @@ package nnet
 import (
 	"github.com/packing/nbpy/codecs"
 	"sync"
-	"time"
+    "math"
 )
 
 type Controller interface {
@@ -48,6 +48,7 @@ type SocketController struct {
 }
 
 type OnControllerStop func(Controller) error
+type OnControllerCome func(Controller) error
 
 type Server interface {
 	Lookup()
@@ -64,6 +65,8 @@ var mutex sync.Mutex
 var mutex2 sync.Mutex
 
 var wsCodecDefault = codecs.CodecIMv2
+
+var currentSessionId SessionID = 0
 
 var sendbufferSize = 1024
 var recvbufferSize = 1024
@@ -180,8 +183,9 @@ func SetRecvBufSize(s int) {
 func NewSessionID() SessionID {
 	mutex.Lock()
 	defer mutex.Unlock()
-	s := uint64(time.Now().UnixNano())
-	s = s & 0x7FFFFFFF
-	//time.Sleep(100 * time.Nanosecond)
-	return s
+    currentSessionId += 1
+    if currentSessionId >= math.MaxUint64 {
+        currentSessionId = 1
+    }
+	return currentSessionId
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 	"github.com/packing/nbpy/utils"
     "sync"
+	"runtime"
 )
 
 const MaxAsyncMessageProcCount = 1024
@@ -121,7 +122,7 @@ func (receiver *Dispatcher) Dispatch() {
 	go func() {
 		for {
 			if receiver.GetAsyncCount() >= MaxAsyncMessageProcCount {
-				utils.LogInfo("消息分派器阻塞 %d", receiver.GetAsyncCount())
+				utils.LogInfo("消息分派器阻塞 %d 协程 %d", receiver.GetAsyncCount(), runtime.NumGoroutine())
 				time.Sleep(1 * time.Millisecond)
 				continue
 			}

@@ -23,6 +23,7 @@ import (
 	"github.com/packing/nbpy/packets"
 	"github.com/packing/nbpy/errors"
 	"github.com/packing/nbpy/utils"
+	"os"
 )
 
 type UnixUDP struct {
@@ -32,6 +33,7 @@ type UnixUDP struct {
 	dataNotifyChan chan int
 	controller     *UnixController
 	isClosed       bool
+	addr 	       string
 
 	associatedObject interface{}
 }
@@ -60,10 +62,15 @@ func (receiver *UnixUDP) Bind(addr string) (error) {
 		return err
 	}
 
+	receiver.addr = addr
 	receiver.isClosed = false
 	receiver.processClient(*unixConn)
 
 	return nil
+}
+
+func (receiver UnixUDP) GetBindAddr() string {
+    return receiver.addr
 }
 
 func (receiver *UnixUDP) processClient(conn net.UnixConn) {
@@ -88,7 +95,13 @@ func (receiver *UnixUDP) SendTo(addr string, msgs...codecs.IMData) ([]codecs.IMD
 	if receiver.isClosed {
 		return msgs, errors.ErrorDataSentIncomplete
 	}
-	return receiver.controller.SendTo(addr, msgs...)
+	_, err := os.Stat(addr)
+	if err == nil || !os.IsNotExist(err) {
+		return receiver.controller.SendTo(addr, msgs...)
+	} else {
+		utils.LogError("无法向 %s 发送数据, 请确认它是否仍存在", addr)
+		return msgs, err
+	}
 }
 
 func (receiver *UnixUDP) SendFileHandler(addr string, fds...int) (error) {

@@ -50,14 +50,31 @@ func createDataReadWriter(codec *codecs.Codec, format *packets.PacketFormat) (*D
 	return s
 }
 
-func (receiver *DataReadWriter) ReadStream(controller Controller) (error) {
+func (receiver *DataReadWriter) PeekPacketLength(stream []byte) int {
+	if receiver.format == nil {
+		return 0
+	}
+	err, _, readLen := receiver.format.Parser.Pop(stream)
+	if err != nil {
+        if err == errors.ErrorDataNotReady {
+            return -1
+        }
+		return 0
+	}
+	return readLen
+}
 
-	var peekData []byte
-	var nPeek int
+
+func (receiver *DataReadWriter) ReadStream(controller Controller, buf *utils.MutexBuffer) error {
+
+    var inData, _ = buf.Peek(1024)
+
+	//var peekData []byte
+	//var nPeek int
 	if receiver.format == nil {
 		//如果没有指定封包格式，则进行封包格式选定操作
-		peekData, _ = controller.Peek(1024)
-		err, pf := env.MatchPacketFormat(peekData)
+		//peekData = inData[:1024]
+		err, pf := env.MatchPacketFormat(inData)
 		if err != nil {
 			if err == errors.ErrorDataNotMatch {
 				//未能匹配任何封包格式，将会中断该连接
@@ -73,14 +90,11 @@ func (receiver *DataReadWriter) ReadStream(controller Controller) (error) {
 
 	if receiver.virgin {
 		//如果仍处于起始状态，调用封包解包器的预处理方法进行某些握手操作并尝试明确协议类型(如果有需要的话，如websocket)
-		if peekData == nil {
-			peekData, nPeek = controller.Peek(1024)
-			if nPeek == 0 {
-				return nil
-			}
-		}
+		//if peekData == nil {
+        //    peekData = inData[:1024]
+		//}
 		receiver.virgin = false
-		err, readLen, pto, ptov,  sd := receiver.format.Parser.Prepare(peekData)
+		err, readLen, pto, ptov,  sd := receiver.format.Parser.Prepare(inData)
 
 		if receiver.codec == nil {
             if pto == codecs.ProtocolReserved && ptov == 0 && receiver.format == packets.PacketFormatWS {
@@ -105,31 +119,47 @@ func (receiver *DataReadWriter) ReadStream(controller Controller) (error) {
 			return nil
 		}
 
-		controller.Read(readLen)
-		_, remain := controller.Peek(1)
-		if remain == 0 {
-			//如果数据已经读完, 等待后续数据到达
-			return nil
-		}
+		if readLen > 0 {
+            buf.Next(readLen)
+            inData, _ = buf.Peek(1024)
+        }
+        if buf.Len() == 0 {
+            //如果数据已经读完, 等待后续数据到达
+            return nil
+        }
 	}
 
 dataCtrl:
 	for {
-		peekData, nPeek = controller.Peek(1024*1024)
-		if nPeek == 0 {
-			return nil
-		}
-		err, packet, readLen := receiver.format.Parser.Pop(peekData)
+		//peekData = inData[:1024*1024]
+        inData, peekLen := buf.Peek(1024)
+		pl := receiver.PeekPacketLength(inData)
+		if pl == 0 {
+            utils.LogError("!!! 封包解包失败，连接 %s 将被关闭1", controller.GetSource())
+            return errors.ErrorDataNotMatch
+        }
+        if pl == -1 {
+            break dataCtrl
+        } else {
+        }
+
+        inData, peekLen = buf.Peek(pl)
+        if pl != peekLen {
+            utils.LogError("!!! 封包解包失败，连接 %s 将被关闭2", controller.GetSource())
+            return errors.ErrorDataNotMatch
+        }
+		err, packet, readLen := receiver.format.Parser.Pop(inData)
 		if err != nil {
 			if err != errors.ErrorDataNotReady {
-				utils.LogError("!!! 封包解包失败，连接 %s 将被关闭", controller.GetSource())
+				utils.LogError("!!! 封包解包失败，连接 %s 将被关闭3", controller.GetSource())
 				return err
 			}
+            utils.LogError("!!! 解不出来包啊这是什么狗屁数据啊大哥", len(inData))
 			break dataCtrl
 		}
 
 		if packet == nil {
-			utils.LogError("!!! 封包解包失败，连接 %s 将被关闭", controller.GetSource())
+			utils.LogError("!!! 封包解包失败，连接 %s 将被关闭4", controller.GetSource())
 			return errors.ErrorDataNotMatch
 		}
 
@@ -156,7 +186,13 @@ dataCtrl:
 			receiver.compressEnabled = packet.CompressSupport
 		}
 
-		controller.Read(readLen)
+		//controller.Read(readLen)
+        //utils.LogInfo("======DataReadWriter========")
+        //utils.LogInfo("buf len => %d", buf.Len())
+        buf.Next(readLen)
+        //utils.LogInfo("buf len => %d", buf.Len())
+        //utils.LogInfo("============================")
+
 		packetData := packet.Raw
 
 		//解密处理
@@ -208,9 +244,13 @@ dataCtrl:
 				goto dataDecode
 			}
 		} else if err != errors.ErrorDataNotEnough {
+			utils.LogInfo("Err: ", err)
+			utils.LogInfo("Raw: ", packetData)
+			utils.LogInfo("readLen: %d", readLen)
 			utils.LogWarn("进行数据解码失败, 连接 %s 将会被强行关闭", controller.GetSource())
 			return err
 		} else {
+            utils.LogError("!!! 我他妈没解出来大哥我也不知道为什么", err)
 		    /*
 			if receiver.OnDataDecoded != nil {
 				err := receiver.OnDataDecoded(controller, controller.GetSource(), []byte(""))

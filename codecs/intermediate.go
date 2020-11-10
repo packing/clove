@@ -831,20 +831,21 @@ func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte){
 		return nil, bytes.Join(rbs, []byte(""))
 	}
 
-	sliceRaw, isSlice := (*raw).(IMSlice)
+	isSlice = tpKind == reflect.Slice
 	if isSlice {
-		var i = 0
-		var rbs = make([][]byte, len(sliceRaw) + 1)
-		for _, v := range sliceRaw {
-			err, vk := receiver.Encode(&v)
+		var totalLen = rawValue.Len()
+		var rbs = make([][]byte, totalLen + 1)
+		for i := 0; i < totalLen; i ++ {
+			v := rawValue.Index(i)
+			iv := v.Interface()
+			err, vk := receiver.Encode(&iv)
 			if err != nil {
 				continue
 			}
 			rbs[i + 1] = vk
-			i ++
 		}
 
-		rbs[0] = makeHeaderAndLength(IMV2DataTypeList, i)
+		rbs[0] = makeHeaderAndLength(IMV2DataTypeList, totalLen)
 
 		return nil, bytes.Join(rbs, []byte(""))
 	}

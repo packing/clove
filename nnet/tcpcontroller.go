@@ -43,11 +43,14 @@ type TCPController struct {
 	DataRW      *DataReadWriter
 	runableData chan int
 	source      string
-	closeCh     chan int
+	flowCh     chan int
 	sendCh     chan int
 	closeOnSended bool
 	closeSendReq bool
+	flowMode bool
+	flowQueueLimit int
 	associatedObject interface{}
+	mutex 		sync.Mutex
 	tag         int
 }
 
@@ -61,7 +64,7 @@ func createTCPController(ioSrc net.Conn, dataRW *DataReadWriter) *TCPController 
 	sor.id = NewSessionID()
 	sor.closeOnSended = false
 	sor.associatedObject = nil
-
+	sor.flowCh = nil
 	return sor
 }
 
@@ -71,6 +74,47 @@ func (receiver *TCPController) SetAssociatedObject(o interface{}) {
 
 func (receiver TCPController) GetAssociatedObject() (interface{}) {
 	return receiver.associatedObject
+}
+
+func (receiver *TCPController) SetFlowQueueLimit(limit int) {
+	receiver.flowQueueLimit = limit
+}
+
+func (receiver *TCPController) SetFlowMode(b bool) {
+	receiver.flowMode = b
+	if b {
+		if receiver.flowCh == nil {
+			receiver.flowCh = make(chan int)
+			receiver.UnlockProcess()
+		}
+	} else {
+		if receiver.flowCh != nil {
+			close(receiver.flowCh)
+			receiver.flowCh = nil
+		}
+	}
+}
+
+func (receiver TCPController) IsFlowMode() bool {
+	return receiver.flowMode
+}
+
+func (receiver *TCPController) LockProcess() bool {
+	if receiver.flowMode {
+		_, ok := <- receiver.flowCh
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func (receiver *TCPController) UnlockProcess() {
+	if receiver.flowMode {
+		go func() {
+			receiver.flowCh <- 1
+		}()
+	}
 }
 
 func (receiver *TCPController) SetTag(tag int) {
@@ -90,7 +134,9 @@ func (receiver TCPController) GetSessionID() SessionID {
 }
 
 func (receiver *TCPController) Close() {
+	receiver.mutex.Lock()
 	defer func() {
+		receiver.mutex.Unlock()
 		utils.LogPanic(recover())
 	}()
 	receiver.closeSendReq = true
@@ -98,6 +144,8 @@ func (receiver *TCPController) Close() {
 		close(receiver.sendCh)
 		receiver.sendCh = nil
 	}
+
+	receiver.SetFlowMode(false)
 	receiver.ioinner.Close()
 }
 
@@ -124,6 +172,13 @@ func (receiver *TCPController) Write(data []byte) {
 	receiver.sendBuffer.Write(data)
 
 	go func() {
+		receiver.mutex.Lock()
+		defer func() {
+			receiver.mutex.Unlock()
+		}()
+		if receiver.closeSendReq {
+			return
+		}
 	    receiver.sendCh <- 1
 	}()
 }
@@ -151,11 +206,18 @@ func (receiver *TCPController) RawSend(msg ...codecs.IMData) error {
     buf, _, err := receiver.DataRW.PackStream(receiver, msg...)
     IncEncodeTime(time.Now().UnixNano() - st)
     if err == nil {
+    	sendProc:
         receiver.ioinner.SetWriteDeadline(time.Now().Add(3 * time.Second))
-        _, sendErr := receiver.ioinner.Write(buf)
+        n, sendErr := receiver.ioinner.Write(buf)
         if sendErr == nil {
-            IncTotalTcpSendSize(len(buf))
+            IncTotalTcpSendSize(n)
+            if n < len(buf) {
+            	buf = buf[n:]
+            	goto sendProc
+			} else {
+			}
         } else {
+        	utils.LogInfo("RawSend Fail!!! => ", sendErr)
             return sendErr
         }
     }
@@ -176,11 +238,11 @@ func (receiver TCPController) SendTo(addr string, msg ...codecs.IMData) ([]codec
 
 func (receiver *TCPController) processData(wg *sync.WaitGroup) {
 	defer func() {
-		receiver.Close()
 		wg.Done()
 		utils.LogPanic(recover())
 	}()
 	//utils.LogVerbose(">>> 连接 %s 开始处理数据解析...", receiver.GetSource())
+
 	for {
 		n, ok := <- receiver.runableData
 		if !ok {
@@ -189,9 +251,22 @@ func (receiver *TCPController) processData(wg *sync.WaitGroup) {
 		if n == 0 {
 			continue
 		}
+
+		ok = receiver.LockProcess()
+		if !ok {
+			break
+		}
+		if receiver.flowMode && len(receiver.runableData) > receiver.flowQueueLimit {
+			utils.LogInfo(">>> 连接 %s 流处理队列长度超出限制，将被强行关闭", receiver.GetSource())
+			receiver.UnlockProcess()
+			receiver.Close()
+			break
+		}
+
 		st := time.Now().UnixNano()
-		err := receiver.DataRW.ReadStream(receiver)
+		err := receiver.DataRW.ReadStream(receiver, receiver.recvBuffer)
 		IncDecodeTime(time.Now().UnixNano() - st)
+
 		if err != nil {
 			receiver.Close()
 			break
@@ -221,6 +296,7 @@ func (receiver *TCPController) processRead(wg *sync.WaitGroup) {
 			runtime.Gosched()
 		}
 		if err != nil || n == 0 {
+			receiver.Close()
 			break
 		}
 	}
@@ -238,22 +314,29 @@ func (receiver *TCPController) processWrite(wg *sync.WaitGroup) {
 		_, ok := <- receiver.sendCh
 		if ok && !receiver.closeSendReq {
 			buf := make([]byte, sendbufferSize)
+
+main:
 			sendBuffLen, _ := receiver.sendBuffer.Read(buf)
+			tobuf := buf[:sendBuffLen]
 			for sendBuffLen > 0 {
                 //设置写超时，避免客户端一直不收包，导致服务器内存暴涨
                 receiver.ioinner.SetWriteDeadline(time.Now().Add(3 * time.Second))
-				sizeWrited, sendErr := receiver.ioinner.Write(buf[:sendBuffLen])
-				if sendErr == nil && sendBuffLen == sizeWrited {
-					if receiver.closeOnSended {
-						receiver.Close()
-					}
+				sizeWrited, sendErr := receiver.ioinner.Write(tobuf)
+				if sendErr == nil {
+                    if sendBuffLen == sizeWrited {
+                        if receiver.closeOnSended {
+                            receiver.Close()
+                        }
 
-					IncTotalTcpSendSize(sendBuffLen)
-					//utils.LogVerbose(">>> 发送完成", sendBuffLen)
-					runtime.Gosched()
-					//repeat = 0
-					sendBuffLen, _ = receiver.sendBuffer.Read(buf)
-					continue
+                        IncTotalTcpSendSize(sendBuffLen)
+                        runtime.Gosched()
+                        goto main
+                    } else {
+                        tobuf = tobuf[:sizeWrited]
+                        sendBuffLen = sendBuffLen - sizeWrited
+                        IncTotalTcpSendSize(sizeWrited)
+                        continue
+                    }
 				}
 				if sendErr != nil {
                     utils.LogError(">>> 连接 %s 发送数据超时或异常，关闭连接", receiver.GetSource())
@@ -271,10 +354,10 @@ func (receiver *TCPController) processWrite(wg *sync.WaitGroup) {
 }
 
 func (receiver *TCPController) Schedule() {
-	receiver.runableData = make(chan int, 10240)
+	receiver.runableData = make(chan int, 1024)
 	receiver.sendCh = make(chan int)
 	wg := new(sync.WaitGroup)
-	wg.Add(4)
+	wg.Add(3)
 	go func() {
 		go receiver.processData(wg)
 		go receiver.processRead(wg)
