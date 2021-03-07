@@ -73,3 +73,11 @@ func ReadAsciiCode(raw []byte) byte {
 	}
 	return raw[0]
 }
+
+func AbsForInt64(n int64) int64 {
+	return (n ^ n >> 63) - n >> 63
+}
+
+func AbsForInt32(n int) int {
+	return (n ^ n >> 32) - n >> 32
+}
