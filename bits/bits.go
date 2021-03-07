@@ -58,7 +58,6 @@ func UnMaskBytes(raw []byte, bitSize byte) (byte, []byte) {
 		if i == (len(raw) - 1) {
 			break
 		}
-
 		srcb[i] = unmaskV << bitSize
 	}
 	return maskSrc, srcb
