@@ -236,7 +236,8 @@ dataCtrl:
                 DecDecodeInstanceCount()
 				if err != nil {
 					utils.LogError("逻辑处理返回错误 > %s, 连接 %s 将会被强行关闭.数据长度: %d",err.Error(), controller.GetSource(), len(packetData))
-					utils.LogError("msg:%s", msg)
+					utils.LogError("msg:", msg)
+					utils.LogError("packetData:", packetData)
 					return err
 				}
 			}
