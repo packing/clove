@@ -203,6 +203,8 @@ func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
     utils.LogError("headlen", headlen)
     utils.LogError("payloadLen", payloadLen)
     utils.LogError("dataLen", dataLen)
+    utils.LogError("maskFlag", maskFlag)
+    utils.LogError("mask", mask)
 
     payloadData := in[:totalLen]
     payloadData = payloadData[headlen:]
