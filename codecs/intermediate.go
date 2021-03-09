@@ -936,8 +936,8 @@ func (receiver IntermediateValue) Slice() ([] interface{}) {
 	return s
 }
 
-var codecIMv1 = Codec{Protocol:ProtocolIM, Version:1, Decoder: DecoderIMv1{}, Encoder: EncoderIMv1{}, Name: "结构化中间数据流"}
+var codecIMv1 = Codec{Protocol:ProtocolIM, Version:1, Decoder: DecoderIMv1{}, Encoder: EncoderIMv1{}, Name: "结构化中间数据流v1"}
 var CodecIMv1 = &codecIMv1
 
-var codecIMv2 = Codec{Protocol:ProtocolIM, Version:2, Decoder: DecoderIMv2{}, Encoder: EncoderIMv2{}, Name: "结构化中间数据流"}
+var codecIMv2 = Codec{Protocol:ProtocolIM, Version:2, Decoder: DecoderIMv2{}, Encoder: EncoderIMv2{}, Name: "结构化中间数据流v2"}
 var CodecIMv2 = &codecIMv2
