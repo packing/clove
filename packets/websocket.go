@@ -200,18 +200,11 @@ func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
         return errors.ErrorDataNotReady, nil, 0
     }
 
-    utils.LogError("headlen", headlen)
-    utils.LogError("payloadLen", payloadLen)
-    utils.LogError("dataLen", dataLen)
-    utils.LogError("maskFlag", maskFlag)
-    utils.LogError("mask", mask)
-
     payloadData := in[:totalLen]
     payloadData = payloadData[headlen:]
 
     unMaskData := make([]byte, len(payloadData))
     if maskFlag == 1 {
-        utils.LogError("需要解码")
         for i := 0; i < len(payloadData); i++ {
             unMaskData[i] = payloadData[i] ^ mask[i%4]
         }

@@ -149,10 +149,6 @@ dataCtrl:
             return errors.ErrorDataNotMatch
         }
 		err, packet, readLen := receiver.format.Parser.Pop(inData)
-		utils.LogError("inData:", inData)
-		utils.LogError("err:", err)
-		utils.LogError("packet:", packet)
-		utils.LogError("readLen:", readLen)
 		if err != nil {
 			if err != errors.ErrorDataNotReady {
 				utils.LogError("!!! 封包解包失败，连接 %s 将被关闭3", controller.GetSource())
@@ -240,7 +236,6 @@ dataCtrl:
                 DecDecodeInstanceCount()
 				if err != nil {
 					utils.LogError("逻辑处理返回错误 > %s, 连接 %s 将会被强行关闭.数据长度: %d",err.Error(), controller.GetSource(), len(packetData))
-
 					return err
 				} else {
 				}
