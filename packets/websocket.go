@@ -178,6 +178,7 @@ func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
         return errors.ErrorDataNotReady, nil, 0
     }
     utils.LogError("headlen", headlen)
+    utils.LogError("payloadLen", payloadLen)
 
     mask := make([]byte, 4)
     switch payloadLen {
