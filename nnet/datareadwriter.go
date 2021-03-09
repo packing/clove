@@ -229,6 +229,10 @@ dataCtrl:
 	dataDecode:
 	//开始使用解码器进行消息解码(单个封包允许包含多个消息体，所以此处有label供goto回流继续解码下一块消息体)
 		err, msg, remianData := receiver.codec.Decoder.Decode(packetData)
+		utils.LogError("packetData:", packetData)
+		utils.LogError("err:", err)
+		utils.LogError("msg:", msg)
+		utils.LogError("remianData:", remianData)
 		if err == nil {
 			if receiver.OnDataDecoded != nil {
 			    IncDecodeInstanceCount()
@@ -236,11 +240,9 @@ dataCtrl:
                 DecDecodeInstanceCount()
 				if err != nil {
 					utils.LogError("逻辑处理返回错误 > %s, 连接 %s 将会被强行关闭.数据长度: %d",err.Error(), controller.GetSource(), len(packetData))
-					utils.LogError("msg:", msg)
-					utils.LogError("packetData:", packetData)
+
 					return err
 				} else {
-					utils.LogInfo("msg:", msg)
 				}
 			}
 			packetData = remianData
