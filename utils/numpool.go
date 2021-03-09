@@ -35,3 +35,13 @@ func CreateNumPool(s, e int64, random bool) []int64 {
 	}
 	return l
 }
+
+func Shuffle(s []interface{}) {
+	r := rand.New(rand.NewSource(time.Now().Unix()))
+	for len(s) > 0 {
+		n := len(s)
+		i := r.Intn(n)
+		s[n-1], s[i] = s[i], s[n-1]
+		s = s[:n-1]
+	}
+}
