@@ -239,6 +239,8 @@ dataCtrl:
 					utils.LogError("msg:", msg)
 					utils.LogError("packetData:", packetData)
 					return err
+				} else {
+					utils.LogInfo("msg:", msg)
 				}
 			}
 			packetData = remianData
