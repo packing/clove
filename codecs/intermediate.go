@@ -483,11 +483,11 @@ type DecoderIMv2 struct {
 type EncoderIMv2 struct {
 }
 
-func calculateTypeSize(o interface{}) (uint32){
+func calculateTypeSize(o interface{}) uint32 {
 	return uint32(reflect.TypeOf(o).Len())
 }
 
-func calculateIMV2TypeSize(imtp byte) (uint32){
+func calculateIMV2TypeSize(imtp byte) uint32 {
 	switch imtp {
 	case IMV2DataTypeInt8: fallthrough
 	case IMV2DataTypeUint8:
@@ -858,13 +858,13 @@ type IntermediateValue struct {
 	raw interface{}
 }
 
-func CreateIntermediateValue(raw interface{}) (*IntermediateValue) {
+func CreateIntermediateValue(raw interface{}) *IntermediateValue {
 	v := new(IntermediateValue)
 	v.raw = raw
 	return v
 }
 
-func (receiver IntermediateValue) String() (string) {
+func (receiver IntermediateValue) String() string {
 	s, ok := receiver.raw.(string)
 	if !ok {
 		return ""
@@ -872,15 +872,15 @@ func (receiver IntermediateValue) String() (string) {
 	return s
 }
 
-func (receiver IntermediateValue) Int() (int) {
+func (receiver IntermediateValue) Int() int {
 	return receiver.IntWithDefault(0)
 }
 
-func (receiver IntermediateValue) Int64() (int64) {
+func (receiver IntermediateValue) Int64() int64 {
 	return receiver.Int64WithDefault(0)
 }
 
-func (receiver IntermediateValue) IntWithDefault(def int) (int) {
+func (receiver IntermediateValue) IntWithDefault(def int) int {
 	s, ok := receiver.raw.(int)
 	if !ok {
 		return def
@@ -888,7 +888,7 @@ func (receiver IntermediateValue) IntWithDefault(def int) (int) {
 	return s
 }
 
-func (receiver IntermediateValue) Int64WithDefault(def int64) (int64) {
+func (receiver IntermediateValue) Int64WithDefault(def int64) int64 {
 	s, ok := receiver.raw.(int64)
 	if !ok {
 		return def
@@ -896,7 +896,7 @@ func (receiver IntermediateValue) Int64WithDefault(def int64) (int64) {
 	return s
 }
 
-func (receiver IntermediateValue) Bool() (bool) {
+func (receiver IntermediateValue) Bool() bool {
 	s, ok := receiver.raw.(bool)
 	if !ok {
 		return false
@@ -904,7 +904,7 @@ func (receiver IntermediateValue) Bool() (bool) {
 	return s
 }
 
-func (receiver IntermediateValue) Float32() (float32) {
+func (receiver IntermediateValue) Float32() float32 {
 	s, ok := receiver.raw.(float32)
 	if !ok {
 		return 0
@@ -912,7 +912,7 @@ func (receiver IntermediateValue) Float32() (float32) {
 	return s
 }
 
-func (receiver IntermediateValue) Float64() (float64) {
+func (receiver IntermediateValue) Float64() float64 {
 	s, ok := receiver.raw.(float64)
 	if !ok {
 		return 0
@@ -920,7 +920,7 @@ func (receiver IntermediateValue) Float64() (float64) {
 	return s
 }
 
-func (receiver IntermediateValue) Map() (map[interface{}] interface{}) {
+func (receiver IntermediateValue) Map() map[interface{}] interface{} {
 	s, ok := receiver.raw.(map[interface{}] interface{})
 	if !ok {
 		return make(map[interface{}] interface{})
@@ -928,7 +928,7 @@ func (receiver IntermediateValue) Map() (map[interface{}] interface{}) {
 	return s
 }
 
-func (receiver IntermediateValue) Slice() ([] interface{}) {
+func (receiver IntermediateValue) Slice() [] interface{} {
 	s, ok := receiver.raw.([] interface{})
 	if !ok {
 		return make([] interface{}, 0)

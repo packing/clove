@@ -42,7 +42,7 @@ type DataReadWriter struct {
 	virgin bool
 }
 
-func createDataReadWriter(codec *codecs.Codec, format *packets.PacketFormat) (*DataReadWriter) {
+func createDataReadWriter(codec *codecs.Codec, format *packets.PacketFormat) *DataReadWriter {
 	s := new(DataReadWriter)
 	s.codec = codec
 	s.format = format
