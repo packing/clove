@@ -199,6 +199,7 @@ func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
 
     totalLen := headlen + int(dataLen&0xFFFFFFFF)
     if len(in) < totalLen {
+    	utils.LogError("DataNotReady", totalLen, len(in))
         return errors.ErrorDataNotReady, nil, 0
     }
 
