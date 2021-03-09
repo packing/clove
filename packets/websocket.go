@@ -209,14 +209,16 @@ func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
     payloadData := in[:totalLen]
     payloadData = payloadData[headlen:]
 
+    unMaskData := make([]byte, len(payloadData))
     if maskFlag == 1 {
+        utils.LogError("需要解码")
         for i := 0; i < len(payloadData); i++ {
-            payloadData[i] = payloadData[i] ^ mask[i%4]
+            unMaskData[i] = payloadData[i] ^ mask[i%4]
         }
     }
 
     pck := new(Packet)
-    pck.Raw = payloadData
+    pck.Raw = unMaskData
     pck.Encrypted = false
     pck.Compressed = false
     pck.CompressSupport = false
