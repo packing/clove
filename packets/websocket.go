@@ -144,8 +144,6 @@ func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
         return errors.ErrorDataNotReady, nil, 0
     }
 
-    utils.LogError("PacketParserWS =>>", string(in))
-
     peekData := in
     opCode := peekData[0] & 0xF
 
@@ -177,8 +175,6 @@ func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
     if len(in) < headlen {
         return errors.ErrorDataNotReady, nil, 0
     }
-    utils.LogError("headlen", headlen)
-    utils.LogError("payloadLen", payloadLen)
 
     mask := make([]byte, 4)
     switch payloadLen {
@@ -199,10 +195,14 @@ func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
         }
     }
 
-    totalLen := headlen + int(dataLen&0xFFFFFFFF)
+    totalLen := headlen + int(dataLen & 0xFFFFFFFF)
     if len(in) < totalLen {
         return errors.ErrorDataNotReady, nil, 0
     }
+
+    utils.LogError("headlen", headlen)
+    utils.LogError("payloadLen", payloadLen)
+    utils.LogError("dataLen", dataLen)
 
     payloadData := in[:totalLen]
     payloadData = payloadData[headlen:]

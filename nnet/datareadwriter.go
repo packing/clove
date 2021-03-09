@@ -149,6 +149,10 @@ dataCtrl:
             return errors.ErrorDataNotMatch
         }
 		err, packet, readLen := receiver.format.Parser.Pop(inData)
+		utils.LogError("inData:", inData)
+		utils.LogError("err:", err)
+		utils.LogError("packet:", packet)
+		utils.LogError("readLen:", readLen)
 		if err != nil {
 			if err != errors.ErrorDataNotReady {
 				utils.LogError("!!! 封包解包失败，连接 %s 将被关闭3", controller.GetSource())
@@ -229,10 +233,6 @@ dataCtrl:
 	dataDecode:
 	//开始使用解码器进行消息解码(单个封包允许包含多个消息体，所以此处有label供goto回流继续解码下一块消息体)
 		err, msg, remianData := receiver.codec.Decoder.Decode(packetData)
-		utils.LogError("packetData:", packetData)
-		utils.LogError("err:", err)
-		utils.LogError("msg:", msg)
-		utils.LogError("remianData:", remianData)
 		if err == nil {
 			if receiver.OnDataDecoded != nil {
 			    IncDecodeInstanceCount()
