@@ -18,6 +18,7 @@
 package codecs
 
 import (
+	"encoding/binary"
 	nberrors "github.com/packing/nbpy/errors"
 	"reflect"
 )
@@ -35,10 +36,12 @@ type IMStrMap = map[string] IMData
 type IMSlice = []IMData
 
 type Decoder interface {
+	SetByteOrder(binary.ByteOrder)
 	Decode([]byte) (error, IMData, []byte)
 }
 
 type Encoder interface {
+	SetByteOrder(binary.ByteOrder)
 	Encode(*IMData) (error, []byte)
 }
 
@@ -51,11 +54,13 @@ type Codec struct {
 }
 
 type DecoderMemory struct {}
+func (receiver *DecoderMemory) SetByteOrder(binary.ByteOrder) {}
 func (receiver DecoderMemory) Decode(raw []byte) (error, IMData, []byte) {
 	return nil, raw, raw[len(raw):]
 }
 
 type EncoderMemory struct {}
+func (receiver *EncoderMemory) SetByteOrder(binary.ByteOrder) {}
 func (receiver EncoderMemory) Encode(raw *IMData) (error, []byte) {
 	data, ok := (*raw).([]byte)
 	if !ok {
@@ -396,7 +401,7 @@ func (receiver IMSliceReader) BoolValueOf(index int) bool {
 	return reflect.ValueOf(v).Bool()
 }
 
-var codecMemoryV1 = Codec{Protocol:ProtocolMemory, Version:1, Decoder: DecoderMemory{}, Encoder: EncoderMemory{}, Name: "二进制流"}
+var codecMemoryV1 = Codec{Protocol:ProtocolMemory, Version:1, Decoder: new(DecoderMemory), Encoder: new(EncoderMemory), Name: "二进制流"}
 var CodecMemoryV1 = &codecMemoryV1
 
 func Int64FromInterface(v interface{}) int64 {

@@ -18,6 +18,7 @@
 package codecs
 
 import (
+	"encoding/binary"
 	"encoding/json"
 )
 
@@ -58,6 +59,7 @@ func tsSlice(s []interface{}) IMSlice {
 }
 
 
+func (receiver *DecoderJSONv1) SetByteOrder(binary.ByteOrder) {}
 func (receiver DecoderJSONv1) Decode(raw []byte) (error, IMData, []byte){
 	dst := make(map[string] interface{})
 	err := json.Unmarshal(raw, &dst)
@@ -70,10 +72,11 @@ func (receiver DecoderJSONv1) Decode(raw []byte) (error, IMData, []byte){
 	}
 }
 
+func (receiver *EncoderJSONv1) SetByteOrder(binary.ByteOrder) {}
 func (receiver EncoderJSONv1) Encode(raw *IMData) (error, []byte){
 	bs, err := json.Marshal(raw)
 	return err, bs
 }
 
-var codecJSONv1 = Codec{Protocol:ProtocolJSON, Version:1, Decoder: DecoderJSONv1{}, Encoder: EncoderJSONv1{}, Name: "JSON数据流"}
+var codecJSONv1 = Codec{Protocol:ProtocolJSON, Version:1, Decoder: new(DecoderJSONv1), Encoder: new(EncoderJSONv1), Name: "JSON数据流"}
 var CodecJSONv1 = &codecJSONv1
