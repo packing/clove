@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -18,25 +20,25 @@
 package utils
 
 import (
-	"os/exec"
-	"os"
-	"syscall"
-	"fmt"
+    "fmt"
+    "os"
+    "os/exec"
+    "syscall"
 )
 
-func Daemon(){
-	argvs := os.Args[1:]
-	argvs = append(argvs, "-s")
-	cmd := exec.Command(os.Args[0], argvs...)
-	cmd.Stdin = nil
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid:true}
+func Daemon() {
+    argvs := os.Args[1:]
+    argvs = append(argvs, "-s")
+    cmd := exec.Command(os.Args[0], argvs...)
+    cmd.Stdin = nil
+    cmd.Stdout = nil
+    cmd.Stderr = nil
+    cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
-	err := cmd.Start()
-	if err == nil {
-		fmt.Printf("Daemon %d created.\n", cmd.Process.Pid)
-		cmd.Process.Release()
-		os.Exit(0)
-	}
+    err := cmd.Start()
+    if err == nil {
+        fmt.Printf("Daemon %d created.\n", cmd.Process.Pid)
+        cmd.Process.Release()
+        os.Exit(0)
+    }
 }
