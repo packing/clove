@@ -110,12 +110,12 @@ func Schedule() os.Signal {
         os.Kill,
         syscall.SIGTERM,
         syscall.SIGKILL,
-        syscall.SIGSTOP,
+        syscall.Signal(0x11),
         syscall.SIGHUP,
         syscall.SIGINT,
         syscall.SIGQUIT,
-        syscall.SIGUSR1,
-        syscall.SIGUSR2,
+        syscall.Signal(0x1e),
+        syscall.Signal(0x1f),
     }
     signal.Notify(c, signals...)
     s := <-c
