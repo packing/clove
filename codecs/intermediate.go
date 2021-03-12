@@ -64,22 +64,22 @@ const (
 
 */
 type DecoderIMv1 struct {
-	byteOrder binary.ByteOrder
+    byteOrder binary.ByteOrder
 }
 
 type EncoderIMv1 struct {
-	byteOrder binary.ByteOrder
+    byteOrder binary.ByteOrder
 }
 
 func (receiver *DecoderIMv1) SetByteOrder(byteOrder binary.ByteOrder) {
-	receiver.byteOrder = byteOrder
+    receiver.byteOrder = byteOrder
 }
 
 func (receiver DecoderIMv1) getByteOrder() binary.ByteOrder {
-	if receiver.byteOrder == nil {
-		return binary.LittleEndian
-	}
-	return receiver.byteOrder
+    if receiver.byteOrder == nil {
+        return binary.LittleEndian
+    }
+    return receiver.byteOrder
 }
 
 func (receiver DecoderIMv1) Decode(raw []byte) (error, IMData, []byte) {
@@ -253,14 +253,14 @@ func (receiver DecoderIMv1) readSlice(data []byte) (error, IMSlice, []byte) {
 }
 
 func (receiver *EncoderIMv1) SetByteOrder(byteOrder binary.ByteOrder) {
-	receiver.byteOrder = byteOrder
+    receiver.byteOrder = byteOrder
 }
 
 func (receiver EncoderIMv1) getByteOrder() binary.ByteOrder {
-	if receiver.byteOrder == nil {
-		return binary.LittleEndian
-	}
-	return receiver.byteOrder
+    if receiver.byteOrder == nil {
+        return binary.LittleEndian
+    }
+    return receiver.byteOrder
 }
 
 func (receiver EncoderIMv1) encodeValueHeader(data *IMData, datasize uint32) (error, []byte) {
@@ -325,7 +325,7 @@ func (receiver EncoderIMv1) encodeValueHeader(data *IMData, datasize uint32) (er
     }
     b := make([]byte, IMDataHeaderLength)
     b[0] = byte(tp)
-	receiver.getByteOrder().PutUint32(b[1:IMDataHeaderLength], size)
+    receiver.getByteOrder().PutUint32(b[1:IMDataHeaderLength], size)
     return nil, b
 }
 
@@ -334,28 +334,28 @@ func (receiver EncoderIMv1) encodeValueWithoutHeader(data *IMData) (error, []byt
     switch reflect.ValueOf(*data).Type().Kind() {
     case reflect.Int:
         b = make([]byte, 4)
-		receiver.getByteOrder().PutUint32(b, uint32((*data).(int)))
+        receiver.getByteOrder().PutUint32(b, uint32((*data).(int)))
     case reflect.Uint:
         b = make([]byte, 4)
-		receiver.getByteOrder().PutUint32(b, uint32((*data).(uint)))
+        receiver.getByteOrder().PutUint32(b, uint32((*data).(uint)))
     case reflect.Int32:
         b = make([]byte, 4)
-		receiver.getByteOrder().PutUint32(b, uint32((*data).(int32)))
+        receiver.getByteOrder().PutUint32(b, uint32((*data).(int32)))
     case reflect.Uint32:
         b = make([]byte, 4)
-		receiver.getByteOrder().PutUint32(b, (*data).(uint32))
+        receiver.getByteOrder().PutUint32(b, (*data).(uint32))
     case reflect.Int64:
         b = make([]byte, 8)
-		receiver.getByteOrder().PutUint64(b, uint64((*data).(int64)))
+        receiver.getByteOrder().PutUint64(b, uint64((*data).(int64)))
     case reflect.Uint64:
         b = make([]byte, 8)
-		receiver.getByteOrder().PutUint64(b, (*data).(uint64))
+        receiver.getByteOrder().PutUint64(b, (*data).(uint64))
     case reflect.Float32:
         b = make([]byte, 4)
-		receiver.getByteOrder().PutUint32(b, math.Float32bits((*data).(float32)))
+        receiver.getByteOrder().PutUint32(b, math.Float32bits((*data).(float32)))
     case reflect.Float64:
         b = make([]byte, 8)
-		receiver.getByteOrder().PutUint64(b, math.Float64bits((*data).(float64)))
+        receiver.getByteOrder().PutUint64(b, math.Float64bits((*data).(float64)))
     case reflect.Bool:
         b = make([]byte, 1)
         b[0] = 0
@@ -370,7 +370,7 @@ func (receiver EncoderIMv1) encodeValueWithoutHeader(data *IMData) (error, []byt
         b[0] = byte((*data).(int8))
     case reflect.Int16:
         b = make([]byte, 2)
-		receiver.getByteOrder().PutUint16(b, uint16((*data).(int16)))
+        receiver.getByteOrder().PutUint16(b, uint16((*data).(int16)))
     default:
         tmap, okmap := (*data).(IMMap)
         if okmap {
@@ -522,11 +522,11 @@ const (
 )
 
 type DecoderIMv2 struct {
-	byteOrder binary.ByteOrder
+    byteOrder binary.ByteOrder
 }
 
 type EncoderIMv2 struct {
-	byteOrder binary.ByteOrder
+    byteOrder binary.ByteOrder
 }
 
 func calculateTypeSize(o interface{}) uint32 {
@@ -584,10 +584,10 @@ func (receiver EncoderIMv2) makeHeaderAndLength(tp byte, lenData int) []byte {
         b[1] = byte(lenb)
     case lenb <= 0xffff:
         lenSize = 2
-		receiver.getByteOrder().PutUint16(b[1:], uint16(lenb))
+        receiver.getByteOrder().PutUint16(b[1:], uint16(lenb))
     default:
         lenSize = 4
-		receiver.getByteOrder().PutUint32(b[1:], uint32(lenb))
+        receiver.getByteOrder().PutUint32(b[1:], uint32(lenb))
     }
     b[0] = makeHeader(tp, lenSize)
     b = b[:1+lenSize]
@@ -595,14 +595,14 @@ func (receiver EncoderIMv2) makeHeaderAndLength(tp byte, lenData int) []byte {
 }
 
 func (receiver *DecoderIMv2) SetByteOrder(byteOrder binary.ByteOrder) {
-	receiver.byteOrder = byteOrder
+    receiver.byteOrder = byteOrder
 }
 
 func (receiver DecoderIMv2) getByteOrder() binary.ByteOrder {
-	if receiver.byteOrder == nil {
-		return binary.BigEndian
-	}
-	return receiver.byteOrder
+    if receiver.byteOrder == nil {
+        return binary.BigEndian
+    }
+    return receiver.byteOrder
 }
 
 func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte) {
@@ -727,14 +727,14 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte) {
 }
 
 func (receiver *EncoderIMv2) SetByteOrder(byteOrder binary.ByteOrder) {
-	receiver.byteOrder = byteOrder
+    receiver.byteOrder = byteOrder
 }
 
 func (receiver EncoderIMv2) getByteOrder() binary.ByteOrder {
-	if receiver.byteOrder == nil {
-		return binary.BigEndian
-	}
-	return receiver.byteOrder
+    if receiver.byteOrder == nil {
+        return binary.BigEndian
+    }
+    return receiver.byteOrder
 }
 
 func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte) {
@@ -823,11 +823,11 @@ func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte) {
                 return nil, rb[:3]
             case intRawValue < -32768 && intRawValue >= -2147483648:
                 rb[0] = makeHeader(IMV2DataTypeInt32, 0)
-				receiver.getByteOrder().PutUint32(rb[1:], uint32(int32(intRawValue)))
+                receiver.getByteOrder().PutUint32(rb[1:], uint32(int32(intRawValue)))
                 return nil, rb[:5]
             default:
                 rb[0] = makeHeader(IMV2DataTypeInt64, 0)
-				receiver.getByteOrder().PutUint64(rb[1:], uint64(intRawValue))
+                receiver.getByteOrder().PutUint64(rb[1:], uint64(intRawValue))
                 return nil, rb
             }
         } else {
@@ -841,15 +841,15 @@ func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte) {
                 return nil, rb[:2]
             case intValue <= 0xffff:
                 rb[0] = makeHeader(IMV2DataTypeUint16, 0)
-				receiver.getByteOrder().PutUint16(rb[1:], uint16(intValue))
+                receiver.getByteOrder().PutUint16(rb[1:], uint16(intValue))
                 return nil, rb[:3]
             case intValue <= 0xffffffff:
                 rb[0] = makeHeader(IMV2DataTypeUint32, 0)
-				receiver.getByteOrder().PutUint32(rb[1:], uint32(intValue))
+                receiver.getByteOrder().PutUint32(rb[1:], uint32(intValue))
                 return nil, rb[:5]
             default:
                 rb[0] = makeHeader(IMV2DataTypeUint64, 0)
-				receiver.getByteOrder().PutUint64(rb[1:], intValue)
+                receiver.getByteOrder().PutUint64(rb[1:], intValue)
                 return nil, rb
             }
         }
@@ -859,11 +859,11 @@ func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte) {
         rb := make([]byte, 9)
         if intValue <= 0xffffffff {
             rb[0] = makeHeader(IMV2DataTypeFloat32, 0)
-			receiver.getByteOrder().PutUint32(rb[1:], uint32(intValue))
+            receiver.getByteOrder().PutUint32(rb[1:], uint32(intValue))
             return nil, rb[:5]
         } else {
             rb[0] = makeHeader(IMV2DataTypeFloat64, 0)
-			receiver.getByteOrder().PutUint64(rb[1:], uint64(intValue))
+            receiver.getByteOrder().PutUint64(rb[1:], uint64(intValue))
             return nil, rb[:9]
         }
     }

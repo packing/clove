@@ -18,11 +18,11 @@
 package nnet
 
 import (
-	"github.com/packing/nbpy/utils"
-	"sync"
-	"net"
-	"github.com/packing/nbpy/codecs"
-	"github.com/packing/nbpy/errors"
+    "github.com/packing/nbpy/codecs"
+    "github.com/packing/nbpy/errors"
+    "github.com/packing/nbpy/utils"
+    "net"
+    "sync"
 )
 
 /*
@@ -32,58 +32,58 @@ goroutine 3 => process data
 */
 
 type UDPDatagram struct {
-	addr string
-	data []byte
+    addr string
+    data []byte
 }
 
 type UDPController struct {
-	OnStop        OnControllerStop
-	id            SessionID
-	recvBuffer    *utils.MutexBuffer
-	ioinner       net.UDPConn
-	DataRW        *DataReadWriter
+    OnStop     OnControllerStop
+    id         SessionID
+    recvBuffer *utils.MutexBuffer
+    ioinner    net.UDPConn
+    DataRW     *DataReadWriter
 
-	queue         chan UDPDatagram
-	associatedObject interface{}
-	tag 			int
+    queue            chan UDPDatagram
+    associatedObject interface{}
+    tag              int
 }
 
-func createUDPController(ioSrc net.UDPConn, dataRW *DataReadWriter) (*UDPController) {
-	sor := new(UDPController)
-	sor.recvBuffer = new(utils.MutexBuffer)
-	sor.ioinner = ioSrc
-	sor.DataRW = dataRW
-	sor.id = NewSessionID()
-	sor.associatedObject = nil
-	return sor
+func createUDPController(ioSrc net.UDPConn, dataRW *DataReadWriter) *UDPController {
+    sor := new(UDPController)
+    sor.recvBuffer = new(utils.MutexBuffer)
+    sor.ioinner = ioSrc
+    sor.DataRW = dataRW
+    sor.id = NewSessionID()
+    sor.associatedObject = nil
+    return sor
 }
 
 func (receiver *UDPController) SetAssociatedObject(o interface{}) {
-	receiver.associatedObject = o
+    receiver.associatedObject = o
 }
 
-func (receiver UDPController) GetAssociatedObject() (interface{}) {
-	return receiver.associatedObject
+func (receiver UDPController) GetAssociatedObject() interface{} {
+    return receiver.associatedObject
 }
 
 func (receiver *UDPController) SetTag(tag int) {
-	receiver.tag = tag
+    receiver.tag = tag
 }
 
 func (receiver *UDPController) GetTag() int {
-	return receiver.tag
+    return receiver.tag
 }
 
-func (receiver UDPController) GetSource() (string){
-	return receiver.ioinner.LocalAddr().String()
+func (receiver UDPController) GetSource() string {
+    return receiver.ioinner.LocalAddr().String()
 }
 
-func (receiver UDPController) GetSessionID() (SessionID){
-	return receiver.id
+func (receiver UDPController) GetSessionID() SessionID {
+    return receiver.id
 }
 
 func (receiver UDPController) Close() {
-	receiver.ioinner.Close()
+    receiver.ioinner.Close()
 }
 
 func (receiver UDPController) Discard() {
@@ -93,89 +93,89 @@ func (receiver UDPController) CloseOnSended() {
 }
 
 func (receiver UDPController) Read(l int) ([]byte, int) {
-	return nil, 0
+    return nil, 0
 }
 
 func (receiver UDPController) Peek(l int) ([]byte, int) {
-	return nil, 0
+    return nil, 0
 }
 
 func (receiver UDPController) Write(data []byte) {
 }
 
 func (receiver UDPController) Send(msg ...codecs.IMData) ([]codecs.IMData, error) {
-	return msg, errors.ErrorDataSentIncomplete
+    return msg, errors.ErrorDataSentIncomplete
 }
 
 func (receiver UDPController) ReadFrom() (string, []byte, int) {
-	return "", nil, 0
+    return "", nil, 0
 }
 
 func (receiver UDPController) WriteTo(addr string, data []byte) {
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
-	if err != nil {
-		return
-	}
-	receiver.ioinner.WriteToUDP(data, udpAddr)
+    udpAddr, err := net.ResolveUDPAddr("udp", addr)
+    if err != nil {
+        return
+    }
+    receiver.ioinner.WriteToUDP(data, udpAddr)
 }
 
 func (receiver *UDPController) SendTo(addr string, msg ...codecs.IMData) ([]codecs.IMData, error) {
-	buf, remainMsgs, err := receiver.DataRW.PackDatagram(receiver, msg...)
-	if err == nil {
-		receiver.WriteTo(addr, buf)
-	}
-	return remainMsgs, err
+    buf, remainMsgs, err := receiver.DataRW.PackDatagram(receiver, msg...)
+    if err == nil {
+        receiver.WriteTo(addr, buf)
+    }
+    return remainMsgs, err
 }
 
 func (receiver *UDPController) processData(group *sync.WaitGroup) {
-	defer utils.LogPanic(recover())
-	for {
-		datagram, ok := <- receiver.queue
-		if !ok {
-			break
-		}
-		err := receiver.DataRW.ReadDatagram(receiver, datagram.addr, datagram.data)
-		if err != nil {
-			receiver.ioinner.Close()
-			break
-		}
-	}
+    defer utils.LogPanic(recover())
+    for {
+        datagram, ok := <-receiver.queue
+        if !ok {
+            break
+        }
+        err := receiver.DataRW.ReadDatagram(receiver, datagram.addr, datagram.data)
+        if err != nil {
+            receiver.ioinner.Close()
+            break
+        }
+    }
 
-	group.Done()
+    group.Done()
 
 }
 func (receiver *UDPController) processRead(group *sync.WaitGroup) {
-	defer utils.LogPanic(recover())
-	var b = make([]byte, 1024 * 1024)
+    defer utils.LogPanic(recover())
+    var b = make([]byte, 1024*1024)
 
-	for {
-		n, addr, err := receiver.ioinner.ReadFromUDP(b)
-		if err != nil {
-			break
-		}
+    for {
+        n, addr, err := receiver.ioinner.ReadFromUDP(b)
+        if err != nil {
+            break
+        }
 
-		bs := make([]byte, n)
-		copy(bs, b[:n])
-		datagram := UDPDatagram{addr:addr.String(), data: bs}
-		receiver.queue <- datagram
-	}
+        bs := make([]byte, n)
+        copy(bs, b[:n])
+        datagram := UDPDatagram{addr: addr.String(), data: bs}
+        receiver.queue <- datagram
+    }
 
-	close(receiver.queue)
-	group.Done()
+    close(receiver.queue)
+    group.Done()
 }
 
 func (receiver *UDPController) Schedule() {
-	receiver.queue = make(chan UDPDatagram, 10240)
-	go func() {
-		group := new(sync.WaitGroup)
-		group.Add(2)
+    receiver.queue = make(chan UDPDatagram, 10240)
+    go func() {
+        group := new(sync.WaitGroup)
+        group.Add(2)
 
-		go receiver.processData(group)
-		go receiver.processRead(group)
+        go receiver.processData(group)
+        go receiver.processRead(group)
 
-		group.Wait()
-		if receiver.OnStop != nil {
-			receiver.OnStop(receiver)
-		}
-	}()
+        group.Wait()
+        if receiver.OnStop != nil {
+            receiver.OnStop(receiver)
+        }
+    }()
 }

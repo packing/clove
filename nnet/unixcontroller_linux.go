@@ -18,16 +18,16 @@
 package nnet
 
 import (
-    "github.com/packing/nbpy/utils"
-    "sync"
-    "net"
     "github.com/packing/nbpy/codecs"
     "github.com/packing/nbpy/errors"
-    "time"
-    "strings"
-    "syscall"
-    "unsafe"
+    "github.com/packing/nbpy/utils"
+    "net"
     "runtime"
+    "strings"
+    "sync"
+    "syscall"
+    "time"
+    "unsafe"
 )
 
 /*
@@ -62,9 +62,8 @@ type UnixController struct {
     closeSendReq     bool
     associatedObject interface{}
 
-
-    mutex           sync.Mutex
-    tag             int
+    mutex sync.Mutex
+    tag   int
 }
 
 func createUnixController(ioSrc net.UnixConn, dataRW *DataReadWriter) (*UnixController) {
@@ -144,7 +143,7 @@ func (receiver UnixController) ReadFrom() (string, []byte, int) {
 }
 
 func (receiver *UnixController) WriteTo(addr string, data []byte) {
-    uData := UnixDatagram{addr:addr, data:data}
+    uData := UnixDatagram{addr: addr, data: data}
 
     go func() {
         receiver.mutex.Lock()
@@ -255,7 +254,6 @@ func (receiver *UnixController) innerProcessWrite(uData UnixDatagram) error {
         return nil
     }
 
-
     for {
         //设置写超时，避免客户端一直不收包，导致服务器内存暴涨
         receiver.ioinner.SetWriteDeadline(time.Now().Add(10 * time.Second))
@@ -292,83 +290,83 @@ func (receiver *UnixController) innerProcessWrite(uData UnixDatagram) error {
     return nil
 
     /*
-    var sendBuffLen uint32 = 0
-    var sendedLen = 0
-    for _, v := range receiver.sendBuffer {
+       var sendBuffLen uint32 = 0
+       var sendedLen = 0
+       for _, v := range receiver.sendBuffer {
 
-        var ret = func() (bool) {
-            mutexSend.Lock()
-            defer mutexSend.Unlock()
+           var ret = func() (bool) {
+               mutexSend.Lock()
+               defer mutexSend.Unlock()
 
-            if v.buffer.Len() < 4 {
-                return false
-            }
-            var bb = make([]byte, 4)
-            v.buffer.Read(bb)
-            sendBuffLen = binary.BigEndian.Uint32(bb)
-            if sendBuffLen > 1024*1024 {
-                //receiver.Close()
-                utils.LogError(">>> 连接 %s 发送缓冲区数据超过1M %d", receiver.GetSource(), sendBuffLen)
-                //delete(receiver.sendBuffer, k)
-                receiver.clearSendBuffer(v.addr)
-                return true
-            }
-            var b = make([]byte, sendBuffLen)
-            var osize = len(b)
-            if sendBuffLen > 0 {
-                size, err := v.buffer.Read(b)
-                if err == nil {
-                    //设置写超时，避免客户端一直不收包，导致服务器内存暴涨
-                    receiver.ioinner.SetWriteDeadline(time.Now().Add(10 * time.Second))
+               if v.buffer.Len() < 4 {
+                   return false
+               }
+               var bb = make([]byte, 4)
+               v.buffer.Read(bb)
+               sendBuffLen = binary.BigEndian.Uint32(bb)
+               if sendBuffLen > 1024*1024 {
+                   //receiver.Close()
+                   utils.LogError(">>> 连接 %s 发送缓冲区数据超过1M %d", receiver.GetSource(), sendBuffLen)
+                   //delete(receiver.sendBuffer, k)
+                   receiver.clearSendBuffer(v.addr)
+                   return true
+               }
+               var b = make([]byte, sendBuffLen)
+               var osize = len(b)
+               if sendBuffLen > 0 {
+                   size, err := v.buffer.Read(b)
+                   if err == nil {
+                       //设置写超时，避免客户端一直不收包，导致服务器内存暴涨
+                       receiver.ioinner.SetWriteDeadline(time.Now().Add(10 * time.Second))
 
-                sendProc:
+                   sendProc:
 
-                    unixAddr, err := net.ResolveUnixAddr("unixgram", v.addr)
-                    if err != nil {
-                        receiver.clearSendBuffer(v.addr)
-                        utils.LogError(">>> 连接 %s 地址解析失败", v.addr)
-                        return true
-                    }
-                    _, sendErr := receiver.ioinner.WriteToUnix(b[:size], unixAddr)
-                    if sendErr == nil {
-                        sendedLen += size
-                        return false
-                    }
-                    if sendErr == nil && size < osize {
-                        if receiver.closeOnSended {
-                            receiver.Close()
-                        }
-                        receiver.clearSendBuffer(v.addr)
-                        return true
-                    }
-                    if strings.Contains(sendErr.Error(), "sendto: no buffer space available") {
-                        time.Sleep(1 * time.Millisecond)
-                        goto sendProc
-                    }
-                    if sendErr != nil {
-                        utils.LogError(">>> 连接 %s -> %s 发送数据超时或异常", receiver.GetSource(), v.addr)
-                        utils.LogError(sendErr.Error())
-                        receiver.clearSendBuffer(v.addr)
-                        return true
-                    }
+                       unixAddr, err := net.ResolveUnixAddr("unixgram", v.addr)
+                       if err != nil {
+                           receiver.clearSendBuffer(v.addr)
+                           utils.LogError(">>> 连接 %s 地址解析失败", v.addr)
+                           return true
+                       }
+                       _, sendErr := receiver.ioinner.WriteToUnix(b[:size], unixAddr)
+                       if sendErr == nil {
+                           sendedLen += size
+                           return false
+                       }
+                       if sendErr == nil && size < osize {
+                           if receiver.closeOnSended {
+                               receiver.Close()
+                           }
+                           receiver.clearSendBuffer(v.addr)
+                           return true
+                       }
+                       if strings.Contains(sendErr.Error(), "sendto: no buffer space available") {
+                           time.Sleep(1 * time.Millisecond)
+                           goto sendProc
+                       }
+                       if sendErr != nil {
+                           utils.LogError(">>> 连接 %s -> %s 发送数据超时或异常", receiver.GetSource(), v.addr)
+                           utils.LogError(sendErr.Error())
+                           receiver.clearSendBuffer(v.addr)
+                           return true
+                       }
 
-                } else {
-                    return false
-                }
-                v.lastTime = time.Now()
-            }
-            return false
-        }()
+                   } else {
+                       return false
+                   }
+                   v.lastTime = time.Now()
+               }
+               return false
+           }()
 
-        if ret {
-            return true
-        }
-    }
-    if sendedLen == 0 {
-        runtime.Gosched()
-    } else {
-        IncTotalUnixSendSize(sendedLen)
-    }*/
+           if ret {
+               return true
+           }
+       }
+       if sendedLen == 0 {
+           runtime.Gosched()
+       } else {
+           IncTotalUnixSendSize(sendedLen)
+       }*/
 
 }
 
@@ -378,7 +376,7 @@ func (receiver *UnixController) processWrite(wg *sync.WaitGroup) {
         utils.LogPanic(recover())
     }()
 
-    main:
+main:
     for {
         uData, ok := <-receiver.sendCh
         if ok {
@@ -389,7 +387,7 @@ func (receiver *UnixController) processWrite(wg *sync.WaitGroup) {
             }
 
             select {
-            case <- receiver.closeCh:
+            case <-receiver.closeCh:
                 utils.LogError(">>> 连接 %s 已关闭", receiver.GetSource())
                 break main
             default:

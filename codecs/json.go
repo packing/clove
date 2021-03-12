@@ -18,8 +18,8 @@
 package codecs
 
 import (
-	"encoding/binary"
-	"encoding/json"
+    "encoding/binary"
+    "encoding/json"
 )
 
 type DecoderJSONv1 struct {
@@ -28,55 +28,54 @@ type DecoderJSONv1 struct {
 type EncoderJSONv1 struct {
 }
 
-func tsMap(m map[string] interface{}) IMMap {
-	rm := make(IMMap)
-	for k, v := range m {
-		switch v.(type) {
-		case map[string] interface{}:
-			rm[k] = tsMap(v.(map[string] interface{}))
-		case []interface{}:
-			rm[k] = tsSlice(v.([]interface{}))
-		default:
-			rm[k] = v
-		}
-	}
-	return rm
+func tsMap(m map[string]interface{}) IMMap {
+    rm := make(IMMap)
+    for k, v := range m {
+        switch v.(type) {
+        case map[string]interface{}:
+            rm[k] = tsMap(v.(map[string]interface{}))
+        case []interface{}:
+            rm[k] = tsSlice(v.([]interface{}))
+        default:
+            rm[k] = v
+        }
+    }
+    return rm
 }
 
 func tsSlice(s []interface{}) IMSlice {
-	rs := make(IMSlice, len(s))
-	for i, v := range s {
-		switch v.(type) {
-		case map[string] interface{}:
-			rs[i] = tsMap(v.(map[string] interface{}))
-		case []interface{}:
-			rs[i] = tsSlice(v.([]interface{}))
-		default:
-			rs[i] = v
-		}
-	}
-	return rs
+    rs := make(IMSlice, len(s))
+    for i, v := range s {
+        switch v.(type) {
+        case map[string]interface{}:
+            rs[i] = tsMap(v.(map[string]interface{}))
+        case []interface{}:
+            rs[i] = tsSlice(v.([]interface{}))
+        default:
+            rs[i] = v
+        }
+    }
+    return rs
 }
 
-
 func (receiver *DecoderJSONv1) SetByteOrder(binary.ByteOrder) {}
-func (receiver DecoderJSONv1) Decode(raw []byte) (error, IMData, []byte){
-	dst := make(map[string] interface{})
-	err := json.Unmarshal(raw, &dst)
-	if err != nil && err.Error() == "json: cannot unmarshal array into Go value of type map[string]interface {}" {
-		dst := make([]interface{},0)
-		err = json.Unmarshal(raw, &dst)
-		return err, tsSlice(dst), []byte("")
-	} else {
-		return err, tsMap(dst), []byte("")
-	}
+func (receiver DecoderJSONv1) Decode(raw []byte) (error, IMData, []byte) {
+    dst := make(map[string]interface{})
+    err := json.Unmarshal(raw, &dst)
+    if err != nil && err.Error() == "json: cannot unmarshal array into Go value of type map[string]interface {}" {
+        dst := make([]interface{}, 0)
+        err = json.Unmarshal(raw, &dst)
+        return err, tsSlice(dst), []byte("")
+    } else {
+        return err, tsMap(dst), []byte("")
+    }
 }
 
 func (receiver *EncoderJSONv1) SetByteOrder(binary.ByteOrder) {}
-func (receiver EncoderJSONv1) Encode(raw *IMData) (error, []byte){
-	bs, err := json.Marshal(raw)
-	return err, bs
+func (receiver EncoderJSONv1) Encode(raw *IMData) (error, []byte) {
+    bs, err := json.Marshal(raw)
+    return err, bs
 }
 
-var codecJSONv1 = Codec{Protocol:ProtocolJSON, Version:1, Decoder: new(DecoderJSONv1), Encoder: new(EncoderJSONv1), Name: "JSON数据流"}
+var codecJSONv1 = Codec{Protocol: ProtocolJSON, Version: 1, Decoder: new(DecoderJSONv1), Encoder: new(EncoderJSONv1), Name: "JSON数据流"}
 var CodecJSONv1 = &codecJSONv1

@@ -18,14 +18,14 @@
 package nnet
 
 import (
-    "github.com/packing/nbpy/utils"
-    "sync"
-    "net"
+    "encoding/binary"
     "github.com/packing/nbpy/codecs"
     "github.com/packing/nbpy/errors"
-    "syscall"
+    "github.com/packing/nbpy/utils"
+    "net"
     "runtime"
-    "encoding/binary"
+    "sync"
+    "syscall"
 )
 
 /*
@@ -35,22 +35,22 @@ goroutine 2 => process data
 
 type UnixMsgData struct {
     addr string
-    b []byte
-    oob []byte
+    b    []byte
+    oob  []byte
 }
 
 type UnixMsgController struct {
-    OnStop        OnControllerStop
-    id            SessionID
-    ioinner       net.UnixConn
+    OnStop  OnControllerStop
+    id      SessionID
+    ioinner net.UnixConn
 
-    queue         chan UnixMsgData
+    queue            chan UnixMsgData
     associatedObject interface{}
 
-    tag         int
+    tag int
 }
 
-func createUnixMsgController(ioSrc net.UnixConn) (*UnixMsgController) {
+func createUnixMsgController(ioSrc net.UnixConn) *UnixMsgController {
     sor := new(UnixMsgController)
     sor.ioinner = ioSrc
     sor.id = NewSessionID()
@@ -62,7 +62,7 @@ func (receiver *UnixMsgController) SetAssociatedObject(o interface{}) {
     receiver.associatedObject = o
 }
 
-func (receiver *UnixMsgController) GetAssociatedObject() (interface{}) {
+func (receiver *UnixMsgController) GetAssociatedObject() interface{} {
     return receiver.associatedObject
 }
 
@@ -74,11 +74,11 @@ func (receiver *UnixMsgController) GetTag() int {
     return receiver.tag
 }
 
-func (receiver UnixMsgController) GetSource() (string){
+func (receiver UnixMsgController) GetSource() string {
     return receiver.ioinner.LocalAddr().String()
 }
 
-func (receiver UnixMsgController) GetSessionID() (SessionID){
+func (receiver UnixMsgController) GetSessionID() SessionID {
     return receiver.id
 }
 
@@ -121,7 +121,7 @@ func (receiver *UnixMsgController) SendTo(addr string, msg ...codecs.IMData) ([]
     return nil, nil
 }
 
-func (receiver UnixMsgController) SendFdTo(addr string, fds...int) (error) {
+func (receiver UnixMsgController) SendFdTo(addr string, fds ...int) error {
     unixAddr, err := net.ResolveUnixAddr("unixgram", addr)
     if err != nil {
         return err
@@ -143,7 +143,7 @@ func (receiver UnixMsgController) SendFdTo(addr string, fds...int) (error) {
 func (receiver *UnixMsgController) processData(group *sync.WaitGroup) {
     defer utils.LogPanic(recover())
     for {
-        msg, ok := <- receiver.queue
+        msg, ok := <-receiver.queue
         if !ok {
             break
         }

@@ -18,25 +18,25 @@
 package env
 
 import (
+    "fmt"
     nbcodecs "github.com/packing/nbpy/codecs"
-    nbpackets "github.com/packing/nbpy/packets"
     nberrors "github.com/packing/nbpy/errors"
-    "reflect"
-    "sort"
+    nbpackets "github.com/packing/nbpy/packets"
     nbutils "github.com/packing/nbpy/utils"
     "os"
-    "syscall"
     "os/signal"
-    "fmt"
+    "reflect"
     "runtime"
-    "strings"
+    "sort"
     "strconv"
+    "strings"
+    "syscall"
 )
 
 var collectionCodecs map[byte]*nbcodecs.Codec
 var collectionPacketFormats []*nbpackets.PacketFormat
 
-func RegisterCodec(codec *nbcodecs.Codec) (error) {
+func RegisterCodec(codec *nbcodecs.Codec) error {
     k := byte((byte(codec.Protocol) << 4) | byte(codec.Version))
     if collectionCodecs == nil {
         collectionCodecs = make(map[byte]*nbcodecs.Codec)

@@ -18,13 +18,13 @@
 package packets
 
 import (
-	"net/http"
-	"bufio"
-	"strings"
-	"github.com/packing/nbpy/codecs"
-	"github.com/packing/nbpy/bits"
-	"github.com/packing/nbpy/errors"
-	"bytes"
+    "bufio"
+    "bytes"
+    "github.com/packing/nbpy/bits"
+    "github.com/packing/nbpy/codecs"
+    "github.com/packing/nbpy/errors"
+    "net/http"
+    "strings"
 )
 
 const HttpHeaderMinLength = 16
@@ -36,57 +36,57 @@ type PacketPackagerHTTP struct {
 }
 
 func (receiver PacketParserHTTP) Prepare(in []byte) (error, int, byte, byte, []byte) {
-	return nil, 0, codecs.ProtocolIM, 2, nil
+    return nil, 0, codecs.ProtocolIM, 2, nil
 }
 
-func (receiver PacketParserHTTP) TryParse(in []byte) (error,bool) {
-	fB := bits.ReadAsciiCode(in)
-	if fB != 71 && fB != 80 {
-		return errors.ErrorDataNotMatch, false
-	}
-	if len(in) < HttpHeaderMinLength {
-		return errors.ErrorDataNotReady, false
-	}
-	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(in)))
-	if err != nil {
-		return err, false
-	}
+func (receiver PacketParserHTTP) TryParse(in []byte) (error, bool) {
+    fB := bits.ReadAsciiCode(in)
+    if fB != 71 && fB != 80 {
+        return errors.ErrorDataNotMatch, false
+    }
+    if len(in) < HttpHeaderMinLength {
+        return errors.ErrorDataNotReady, false
+    }
+    req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(in)))
+    if err != nil {
+        return err, false
+    }
 
-	if strings.ToLower(req.Header.Get("Upgrade")) == "websocket" {
-		return errors.ErrorDataNotMatch, false
-	}
+    if strings.ToLower(req.Header.Get("Upgrade")) == "websocket" {
+        return errors.ErrorDataNotMatch, false
+    }
 
-	return nil, true
+    return nil, true
 }
 
 func (receiver PacketParserHTTP) Pop(in []byte) (error, *Packet, int) {
-	if len(in) < HttpHeaderMinLength {
-		return errors.ErrorDataNotReady, nil, 0
-	}
+    if len(in) < HttpHeaderMinLength {
+        return errors.ErrorDataNotReady, nil, 0
+    }
 
-	dict := make(codecs.IMMap)
-	dict["http"] = string(in[:])
-	d := codecs.IMData(dict)
-	err, out := codecs.CodecIMv2.Encoder.Encode(&d)
-	if err != nil {
-		return errors.ErrorDataNotReady, nil, 0
-	}
+    dict := make(codecs.IMMap)
+    dict["http"] = string(in[:])
+    d := codecs.IMData(dict)
+    err, out := codecs.CodecIMv2.Encoder.Encode(&d)
+    if err != nil {
+        return errors.ErrorDataNotReady, nil, 0
+    }
 
-	pck := new(Packet)
-	pck.Raw = out
-	pck.Encrypted = false
-	pck.Compressed = false
-	pck.CompressSupport = false
-	pck.ProtocolType = codecs.ProtocolIM
-	pck.ProtocolVer = 2
+    pck := new(Packet)
+    pck.Raw = out
+    pck.Encrypted = false
+    pck.Compressed = false
+    pck.CompressSupport = false
+    pck.ProtocolType = codecs.ProtocolIM
+    pck.ProtocolVer = 2
 
-	return nil, pck, len(in)
+    return nil, pck, len(in)
 }
 
 func (receiver PacketPackagerHTTP) Package(pck *Packet, raw []byte) (error, []byte) {
 
-	return nil, []byte("")
+    return nil, []byte("")
 }
 
-var packetFormatHTTP = PacketFormat{Tag: "HTTP", Priority:0, Parser: PacketParserHTTP{}, Packager: PacketPackagerHTTP{}}
+var packetFormatHTTP = PacketFormat{Tag: "HTTP", Priority: 0, Parser: PacketParserHTTP{}, Packager: PacketPackagerHTTP{}}
 var PacketFormatHTTP = &packetFormatHTTP

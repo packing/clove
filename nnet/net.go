@@ -18,49 +18,50 @@
 package nnet
 
 import (
-	"github.com/packing/nbpy/codecs"
-	"sync"
+    "github.com/packing/nbpy/codecs"
     "math"
+    "sync"
 )
 
 type Controller interface {
-	GetSource() string
-	GetSessionID() SessionID
-	Discard()
-	Read(int) ([]byte, int)
-	Peek(int) ([]byte, int)
-	Write([]byte)
-	Send(...codecs.IMData) ([]codecs.IMData, error)
-	ReadFrom() (string, []byte, int)
-	WriteTo(string, []byte)
-	SendTo(string, ...codecs.IMData) ([]codecs.IMData, error)
-	Close()
-	Schedule()
-	CloseOnSended()
-	GetAssociatedObject() interface{}
+    GetSource() string
+    GetSessionID() SessionID
+    Discard()
+    Read(int) ([]byte, int)
+    Peek(int) ([]byte, int)
+    Write([]byte)
+    Send(...codecs.IMData) ([]codecs.IMData, error)
+    ReadFrom() (string, []byte, int)
+    WriteTo(string, []byte)
+    SendTo(string, ...codecs.IMData) ([]codecs.IMData, error)
+    Close()
+    Schedule()
+    CloseOnSended()
+    GetAssociatedObject() interface{}
     GetTag() int
     SetTag(int)
 }
 
 type SocketController struct {
-	OnWelcome func(Controller) error
-	OnBye func(Controller) error
+    OnWelcome func(Controller) error
+    OnBye     func(Controller) error
 }
 
 type OnControllerStop func(Controller) error
 type OnControllerCome func(Controller) error
 
 type Server interface {
-	Lookup()
-	Boardcast(codecs.IMData)
-	Mutilcast([]SessionID, codecs.IMData)
+    Lookup()
+    Boardcast(codecs.IMData)
+    Mutilcast([]SessionID, codecs.IMData)
 }
 
 type FileHandleController interface {
-	OnFileHandleReceived(fd int) (error)
+    OnFileHandleReceived(fd int) error
 }
 
 type SessionID = uint64
+
 var mutex sync.Mutex
 var mutex2 sync.Mutex
 
@@ -181,11 +182,11 @@ func SetRecvBufSize(s int) {
 }
 
 func NewSessionID() SessionID {
-	mutex.Lock()
-	defer mutex.Unlock()
+    mutex.Lock()
+    defer mutex.Unlock()
     currentSessionId += 1
     if currentSessionId >= math.MaxUint64 {
         currentSessionId = 1
     }
-	return currentSessionId
+    return currentSessionId
 }

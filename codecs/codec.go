@@ -18,439 +18,520 @@
 package codecs
 
 import (
-	"encoding/binary"
-	nberrors "github.com/packing/nbpy/errors"
-	"reflect"
+    "encoding/binary"
+    nberrors "github.com/packing/nbpy/errors"
+    "reflect"
 )
 
 const (
-	ProtocolMemory  	= 0x0
-	ProtocolIM 			= 0x1
-	ProtocolJSON 		= 0x2
-	ProtocolReserved 	= 0xF
+    ProtocolMemory   = 0x0
+    ProtocolIM       = 0x1
+    ProtocolJSON     = 0x2
+    ProtocolReserved = 0xF
 )
 
 type IMData = interface{}
-type IMMap = map[IMData] IMData
-type IMStrMap = map[string] IMData
+type IMMap = map[IMData]IMData
+type IMStrMap = map[string]IMData
 type IMSlice = []IMData
 
 type Decoder interface {
-	SetByteOrder(binary.ByteOrder)
-	Decode([]byte) (error, IMData, []byte)
+    SetByteOrder(binary.ByteOrder)
+    Decode([]byte) (error, IMData, []byte)
 }
 
 type Encoder interface {
-	SetByteOrder(binary.ByteOrder)
-	Encode(*IMData) (error, []byte)
+    SetByteOrder(binary.ByteOrder)
+    Encode(*IMData) (error, []byte)
 }
 
 type Codec struct {
-	Protocol byte
-	Version byte
-	Decoder Decoder
-	Encoder Encoder
-	Name string
+    Protocol byte
+    Version  byte
+    Decoder  Decoder
+    Encoder  Encoder
+    Name     string
 }
 
-type DecoderMemory struct {}
+type DecoderMemory struct{}
+
 func (receiver *DecoderMemory) SetByteOrder(binary.ByteOrder) {}
 func (receiver DecoderMemory) Decode(raw []byte) (error, IMData, []byte) {
-	return nil, raw, raw[len(raw):]
+    return nil, raw, raw[len(raw):]
 }
 
-type EncoderMemory struct {}
+type EncoderMemory struct{}
+
 func (receiver *EncoderMemory) SetByteOrder(binary.ByteOrder) {}
 func (receiver EncoderMemory) Encode(raw *IMData) (error, []byte) {
-	data, ok := (*raw).([]byte)
-	if !ok {
-		return nberrors.ErrorTypeNotSupported, nil
-	}
-	return nil, data
+    data, ok := (*raw).([]byte)
+    if !ok {
+        return nberrors.ErrorTypeNotSupported, nil
+    }
+    return nil, data
 }
 
 type IMMapReader struct {
-	Map IMMap
+    Map IMMap
 }
 
-func CreateMapReader(m IMMap) * IMMapReader {
-	mr := new(IMMapReader)
-	mr.Map = m
-	return mr
+func CreateMapReader(m IMMap) *IMMapReader {
+    mr := new(IMMapReader)
+    mr.Map = m
+    return mr
 }
 
 func (receiver IMMapReader) TryReadValue(key interface{}) interface{} {
-	kind := reflect.TypeOf(key).Kind()
-	switch kind {
-	case reflect.String:
-		return receiver.Map[key]
+    kind := reflect.TypeOf(key).Kind()
+    switch kind {
+    case reflect.String:
+        return receiver.Map[key]
 
-	case reflect.Int: fallthrough
-	case reflect.Int8: fallthrough
-	case reflect.Int16: fallthrough
-	case reflect.Int32: fallthrough
-	case reflect.Int64:
-		intV := reflect.ValueOf(key).Int()
-		v, ok := receiver.Map[int(intV)]
-		if ok {
-			return v
-		}
+    case reflect.Int:
+        fallthrough
+    case reflect.Int8:
+        fallthrough
+    case reflect.Int16:
+        fallthrough
+    case reflect.Int32:
+        fallthrough
+    case reflect.Int64:
+        intV := reflect.ValueOf(key).Int()
+        v, ok := receiver.Map[int(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[int8(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[int8(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[int16(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[int16(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[int32(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[int32(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[int64(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[int64(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[uint(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[uint(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[uint8(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[uint8(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[uint16(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[uint16(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[uint32(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[uint32(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[uint64(intV)]
-		if ok {
-			return v
-		} else {
-			return nil
-		}
+        v, ok = receiver.Map[uint64(intV)]
+        if ok {
+            return v
+        } else {
+            return nil
+        }
 
-	case reflect.Uint: fallthrough
-	case reflect.Uint8: fallthrough
-	case reflect.Uint16: fallthrough
-	case reflect.Uint32: fallthrough
-	case reflect.Uint64:
-		intV := reflect.ValueOf(key).Uint()
-		v, ok := receiver.Map[uint(intV)]
-		if ok {
-			return v
-		}
+    case reflect.Uint:
+        fallthrough
+    case reflect.Uint8:
+        fallthrough
+    case reflect.Uint16:
+        fallthrough
+    case reflect.Uint32:
+        fallthrough
+    case reflect.Uint64:
+        intV := reflect.ValueOf(key).Uint()
+        v, ok := receiver.Map[uint(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[uint8(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[uint8(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[uint16(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[uint16(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[uint32(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[uint32(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[uint64(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[uint64(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[int(intV)]
-		if ok {
-			return v
-		}
-		v, ok = receiver.Map[int8(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[int(intV)]
+        if ok {
+            return v
+        }
+        v, ok = receiver.Map[int8(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[int16(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[int16(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[int32(intV)]
-		if ok {
-			return v
-		}
+        v, ok = receiver.Map[int32(intV)]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[int64(intV)]
-		if ok {
-			return v
-		} else {
-			return nil
-		}
+        v, ok = receiver.Map[int64(intV)]
+        if ok {
+            return v
+        } else {
+            return nil
+        }
 
-	case reflect.Float32: fallthrough
-	case reflect.Float64:
-		floatV := reflect.ValueOf(key).Float()
+    case reflect.Float32:
+        fallthrough
+    case reflect.Float64:
+        floatV := reflect.ValueOf(key).Float()
 
-		v, ok := receiver.Map[floatV]
-		if ok {
-			return v
-		}
+        v, ok := receiver.Map[floatV]
+        if ok {
+            return v
+        }
 
-		v, ok = receiver.Map[float32(floatV)]
-		if ok {
-			return v
-		} else {
-			return nil
-		}
+        v, ok = receiver.Map[float32(floatV)]
+        if ok {
+            return v
+        } else {
+            return nil
+        }
 
-	default:
-		return nil
-	}
+    default:
+        return nil
+    }
 }
 
 func (receiver IMMapReader) IntValueOf(key interface{}, def int64) int64 {
-	v := receiver.TryReadValue(key)
-	if v == nil {
-		return def
-	}
-	switch v.(type) {
-	case int: return int64(v.(int))
-	case int8: return int64(v.(int8))
-	case int16: return int64(v.(int16))
-	case int32: return int64(v.(int32))
-	case uint64: return int64(v.(uint64))
-	case uint: return int64(v.(uint))
-	case uint8: return int64(v.(uint8))
-	case uint16: return int64(v.(uint16))
-	case uint32: return int64(v.(uint32))
-	case int64: return v.(int64)
-	default:
-		return def
-	}
+    v := receiver.TryReadValue(key)
+    if v == nil {
+        return def
+    }
+    switch v.(type) {
+    case int:
+        return int64(v.(int))
+    case int8:
+        return int64(v.(int8))
+    case int16:
+        return int64(v.(int16))
+    case int32:
+        return int64(v.(int32))
+    case uint64:
+        return int64(v.(uint64))
+    case uint:
+        return int64(v.(uint))
+    case uint8:
+        return int64(v.(uint8))
+    case uint16:
+        return int64(v.(uint16))
+    case uint32:
+        return int64(v.(uint32))
+    case int64:
+        return v.(int64)
+    default:
+        return def
+    }
 }
 
 func (receiver IMMapReader) UintValueOf(key interface{}, def uint64) uint64 {
-	v := receiver.TryReadValue(key)
-	if v == nil {
-		return def
-	}
-	switch v.(type) {
-	case int: return uint64(v.(int))
-	case int8: return uint64(v.(int8))
-	case int16: return uint64(v.(int16))
-	case int32: return uint64(v.(int32))
-	case int64: return uint64(v.(int64))
-	case uint: return uint64(v.(uint))
-	case uint8: return uint64(v.(uint8))
-	case uint16: return uint64(v.(uint16))
-	case uint32: return uint64(v.(uint32))
-	case uint64: return v.(uint64)
-	default:
-		return def
-	}
+    v := receiver.TryReadValue(key)
+    if v == nil {
+        return def
+    }
+    switch v.(type) {
+    case int:
+        return uint64(v.(int))
+    case int8:
+        return uint64(v.(int8))
+    case int16:
+        return uint64(v.(int16))
+    case int32:
+        return uint64(v.(int32))
+    case int64:
+        return uint64(v.(int64))
+    case uint:
+        return uint64(v.(uint))
+    case uint8:
+        return uint64(v.(uint8))
+    case uint16:
+        return uint64(v.(uint16))
+    case uint32:
+        return uint64(v.(uint32))
+    case uint64:
+        return v.(uint64)
+    default:
+        return def
+    }
 }
 
 func (receiver IMMapReader) StrValueOf(key interface{}, def string) string {
-	v := receiver.TryReadValue(key)
-	if v == nil {
-		return def
-	}
-	if reflect.TypeOf(v).Kind() != reflect.String {
-		return def
-	}
-	return reflect.ValueOf(v).String()
+    v := receiver.TryReadValue(key)
+    if v == nil {
+        return def
+    }
+    if reflect.TypeOf(v).Kind() != reflect.String {
+        return def
+    }
+    return reflect.ValueOf(v).String()
 }
 
 func (receiver IMMapReader) FloatValueOf(key interface{}, def float64) float64 {
-	v := receiver.TryReadValue(key)
-	if v == nil {
-		return def
-	}
-	if reflect.TypeOf(v).Kind() != reflect.Float64 && reflect.TypeOf(v).Kind() != reflect.Float32 {
-		return def
-	}
-	return reflect.ValueOf(v).Float()
+    v := receiver.TryReadValue(key)
+    if v == nil {
+        return def
+    }
+    if reflect.TypeOf(v).Kind() != reflect.Float64 && reflect.TypeOf(v).Kind() != reflect.Float32 {
+        return def
+    }
+    return reflect.ValueOf(v).Float()
 }
 
 func (receiver IMMapReader) BoolValueOf(key interface{}) bool {
-	v := receiver.TryReadValue(key)
-	if v == nil {
-		return false
-	}
-	if reflect.TypeOf(v).Kind() != reflect.Bool {
-		return false
-	}
-	return reflect.ValueOf(v).Bool()
+    v := receiver.TryReadValue(key)
+    if v == nil {
+        return false
+    }
+    if reflect.TypeOf(v).Kind() != reflect.Bool {
+        return false
+    }
+    return reflect.ValueOf(v).Bool()
 }
 
 type IMSliceReader struct {
-	List IMSlice
+    List IMSlice
 }
 
-func CreateSliceReader(m IMSlice) * IMSliceReader {
-	mr := new(IMSliceReader)
-	mr.List = m
-	return mr
+func CreateSliceReader(m IMSlice) *IMSliceReader {
+    mr := new(IMSliceReader)
+    mr.List = m
+    return mr
 }
 
 func (receiver IMSliceReader) IntValueOf(index int, def int64) int64 {
-	if index >= len(receiver.List) || index < 0 {
-		return def
-	}
-	v := receiver.List[index]
-	if v == nil {
-		return def
-	}
-	switch v.(type) {
-	case int: return int64(v.(int))
-	case int8: return int64(v.(int8))
-	case int16: return int64(v.(int16))
-	case int32: return int64(v.(int32))
-	case uint64: return int64(v.(uint64))
-	case uint: return int64(v.(uint))
-	case uint8: return int64(v.(uint8))
-	case uint16: return int64(v.(uint16))
-	case uint32: return int64(v.(uint32))
-	case int64: return v.(int64)
-	default:
-		return def
-	}
+    if index >= len(receiver.List) || index < 0 {
+        return def
+    }
+    v := receiver.List[index]
+    if v == nil {
+        return def
+    }
+    switch v.(type) {
+    case int:
+        return int64(v.(int))
+    case int8:
+        return int64(v.(int8))
+    case int16:
+        return int64(v.(int16))
+    case int32:
+        return int64(v.(int32))
+    case uint64:
+        return int64(v.(uint64))
+    case uint:
+        return int64(v.(uint))
+    case uint8:
+        return int64(v.(uint8))
+    case uint16:
+        return int64(v.(uint16))
+    case uint32:
+        return int64(v.(uint32))
+    case int64:
+        return v.(int64)
+    default:
+        return def
+    }
 }
 
 func (receiver IMSliceReader) UintValueOf(index int, def uint64) uint64 {
-	if index >= len(receiver.List) || index < 0 {
-		return def
-	}
-	v := receiver.List[index]
-	if v == nil {
-		return def
-	}
-	switch v.(type) {
-	case int: return uint64(v.(int))
-	case int8: return uint64(v.(int8))
-	case int16: return uint64(v.(int16))
-	case int32: return uint64(v.(int32))
-	case int64: return uint64(v.(int64))
-	case uint: return uint64(v.(uint))
-	case uint8: return uint64(v.(uint8))
-	case uint16: return uint64(v.(uint16))
-	case uint32: return uint64(v.(uint32))
-	case uint64: return v.(uint64)
-	default:
-		return def
-	}
+    if index >= len(receiver.List) || index < 0 {
+        return def
+    }
+    v := receiver.List[index]
+    if v == nil {
+        return def
+    }
+    switch v.(type) {
+    case int:
+        return uint64(v.(int))
+    case int8:
+        return uint64(v.(int8))
+    case int16:
+        return uint64(v.(int16))
+    case int32:
+        return uint64(v.(int32))
+    case int64:
+        return uint64(v.(int64))
+    case uint:
+        return uint64(v.(uint))
+    case uint8:
+        return uint64(v.(uint8))
+    case uint16:
+        return uint64(v.(uint16))
+    case uint32:
+        return uint64(v.(uint32))
+    case uint64:
+        return v.(uint64)
+    default:
+        return def
+    }
 }
 
 func (receiver IMSliceReader) StrValueOf(index int, def string) string {
-	if index >= len(receiver.List) || index < 0 {
-		return def
-	}
-	v := receiver.List[index]
-	if reflect.TypeOf(v).Kind() != reflect.String {
-		return def
-	}
-	return reflect.ValueOf(v).String()
+    if index >= len(receiver.List) || index < 0 {
+        return def
+    }
+    v := receiver.List[index]
+    if reflect.TypeOf(v).Kind() != reflect.String {
+        return def
+    }
+    return reflect.ValueOf(v).String()
 }
 
 func (receiver IMSliceReader) MySQLStrValueOf(index int, def string) string {
-	if index >= len(receiver.List) || index < 0 {
-		return def
-	}
-	v := receiver.List[index]
-	if v == nil {
-		return def
-	}
-	if reflect.TypeOf(v).Kind() != reflect.Slice {
-		return def
-	}
-	return string(reflect.ValueOf(v).Bytes())
+    if index >= len(receiver.List) || index < 0 {
+        return def
+    }
+    v := receiver.List[index]
+    if v == nil {
+        return def
+    }
+    if reflect.TypeOf(v).Kind() != reflect.Slice {
+        return def
+    }
+    return string(reflect.ValueOf(v).Bytes())
 }
 
 func (receiver IMSliceReader) FloatValueOf(index int, def float64) float64 {
-	if index >= len(receiver.List) || index < 0 {
-		return def
-	}
-	v := receiver.List[index]
-	if reflect.TypeOf(v).Kind() != reflect.Float64 && reflect.TypeOf(v).Kind() != reflect.Float32 {
-		return def
-	}
-	return reflect.ValueOf(v).Float()
+    if index >= len(receiver.List) || index < 0 {
+        return def
+    }
+    v := receiver.List[index]
+    if reflect.TypeOf(v).Kind() != reflect.Float64 && reflect.TypeOf(v).Kind() != reflect.Float32 {
+        return def
+    }
+    return reflect.ValueOf(v).Float()
 }
 
 func (receiver IMSliceReader) BoolValueOf(index int) bool {
-	if index >= len(receiver.List) || index < 0 {
-		return false
-	}
-	v := receiver.List[index]
-	if reflect.TypeOf(v).Kind() != reflect.Bool {
-		return false
-	}
-	return reflect.ValueOf(v).Bool()
+    if index >= len(receiver.List) || index < 0 {
+        return false
+    }
+    v := receiver.List[index]
+    if reflect.TypeOf(v).Kind() != reflect.Bool {
+        return false
+    }
+    return reflect.ValueOf(v).Bool()
 }
 
-var codecMemoryV1 = Codec{Protocol:ProtocolMemory, Version:1, Decoder: new(DecoderMemory), Encoder: new(EncoderMemory), Name: "二进制流"}
+var codecMemoryV1 = Codec{Protocol: ProtocolMemory, Version: 1, Decoder: new(DecoderMemory), Encoder: new(EncoderMemory), Name: "二进制流"}
 var CodecMemoryV1 = &codecMemoryV1
 
 func Int64FromInterface(v interface{}) int64 {
-	var rv int64 = 0
-	switch v.(type) {
-	case int: rv = int64(v.(int))
-	case int8: rv = int64(v.(int8))
-	case int16: rv = int64(v.(int16))
-	case int32: rv = int64(v.(int32))
-	case int64: rv = int64(v.(int64))
-	case uint: rv = int64(v.(uint))
-	case uint8: rv = int64(v.(uint8))
-	case uint16: rv = int64(v.(uint16))
-	case uint32: rv = int64(v.(uint32))
-	case uint64: rv = int64(v.(uint64))
-	}
-	return rv
+    var rv int64 = 0
+    switch v.(type) {
+    case int:
+        rv = int64(v.(int))
+    case int8:
+        rv = int64(v.(int8))
+    case int16:
+        rv = int64(v.(int16))
+    case int32:
+        rv = int64(v.(int32))
+    case int64:
+        rv = int64(v.(int64))
+    case uint:
+        rv = int64(v.(uint))
+    case uint8:
+        rv = int64(v.(uint8))
+    case uint16:
+        rv = int64(v.(uint16))
+    case uint32:
+        rv = int64(v.(uint32))
+    case uint64:
+        rv = int64(v.(uint64))
+    }
+    return rv
 }
 
 func Uint64FromInterface(v interface{}) uint64 {
-	var rv uint64 = 0
-	switch v.(type) {
-	case int: rv = uint64(v.(int))
-	case int8: rv = uint64(v.(int8))
-	case int16: rv = uint64(v.(int16))
-	case int32: rv = uint64(v.(int32))
-	case int64: rv = uint64(v.(int64))
-	case uint: rv = uint64(v.(uint))
-	case uint8: rv = uint64(v.(uint8))
-	case uint16: rv = uint64(v.(uint16))
-	case uint32: rv = uint64(v.(uint32))
-	case uint64: rv = uint64(v.(uint64))
-	}
-	return rv
+    var rv uint64 = 0
+    switch v.(type) {
+    case int:
+        rv = uint64(v.(int))
+    case int8:
+        rv = uint64(v.(int8))
+    case int16:
+        rv = uint64(v.(int16))
+    case int32:
+        rv = uint64(v.(int32))
+    case int64:
+        rv = uint64(v.(int64))
+    case uint:
+        rv = uint64(v.(uint))
+    case uint8:
+        rv = uint64(v.(uint8))
+    case uint16:
+        rv = uint64(v.(uint16))
+    case uint32:
+        rv = uint64(v.(uint32))
+    case uint64:
+        rv = uint64(v.(uint64))
+    }
+    return rv
 }
 
 func IntFromInterface(v interface{}) int {
     var rv = 0
     switch v.(type) {
-    case int: rv = v.(int)
-    case int8: rv = int(v.(int8))
-    case int16: rv = int(v.(int16))
-    case int32: rv = int(v.(int32))
-    case int64: rv = int(v.(int64))
-    case uint: rv = int(v.(uint))
-    case uint8: rv = int(v.(uint8))
-    case uint16: rv = int(v.(uint16))
-    case uint32: rv = int(v.(uint32))
-    case uint64: rv = int(v.(uint64))
+    case int:
+        rv = v.(int)
+    case int8:
+        rv = int(v.(int8))
+    case int16:
+        rv = int(v.(int16))
+    case int32:
+        rv = int(v.(int32))
+    case int64:
+        rv = int(v.(int64))
+    case uint:
+        rv = int(v.(uint))
+    case uint8:
+        rv = int(v.(uint8))
+    case uint16:
+        rv = int(v.(uint16))
+    case uint32:
+        rv = int(v.(uint32))
+    case uint64:
+        rv = int(v.(uint64))
     }
     return rv
 }

@@ -18,30 +18,30 @@
 package messages
 
 import (
-	"github.com/packing/nbpy/codecs"
-	"github.com/packing/nbpy/nnet"
+    "github.com/packing/nbpy/codecs"
+    "github.com/packing/nbpy/nnet"
 )
 
 type MessageQueue chan *Message
 
-func (receiver MessageQueue) Push(controller nnet.Controller, addr string, data codecs.IMData) (error) {
-	msg, err := MessageFromData(controller, addr, data)
-	if err != nil {
-		return err
-	}
-	var ch = receiver
-	go func() {
-		ch <- msg
-		}()
-	return nil
+func (receiver MessageQueue) Push(controller nnet.Controller, addr string, data codecs.IMData) error {
+    msg, err := MessageFromData(controller, addr, data)
+    if err != nil {
+        return err
+    }
+    var ch = receiver
+    go func() {
+        ch <- msg
+    }()
+    return nil
 }
 
-func (receiver MessageQueue) Pop() (*Message) {
-	msg, ok := <-receiver
-	if !ok {
-		return nil
-	}
-	return msg
+func (receiver MessageQueue) Pop() *Message {
+    msg, ok := <-receiver
+    if !ok {
+        return nil
+    }
+    return msg
 }
 
 var GlobalMessageQueue = make(MessageQueue, 102400)

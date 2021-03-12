@@ -18,14 +18,14 @@
 package caches
 
 import (
-    "github.com/packing/nbpy/nnet"
-    "github.com/packing/nbpy/codecs"
     "fmt"
-    "os"
+    "github.com/packing/nbpy/codecs"
     "github.com/packing/nbpy/errors"
-    "strings"
+    "github.com/packing/nbpy/nnet"
     "github.com/packing/nbpy/packets"
+    "os"
     "reflect"
+    "strings"
 )
 
 const (
@@ -46,7 +46,7 @@ const (
 
 var KeyValueErrorRet = errors.Errorf("Keyvalue cacheServer return fail")
 
-func convertToInt64(v interface{}, def int64) (int64) {
+func convertToInt64(v interface{}, def int64) int64 {
     if v == nil {
         return def
     }
@@ -85,7 +85,7 @@ type KeyValueCache struct {
     lookupChan chan interface{}
 }
 
-func CreateKeyValueCache(addr string, keepAlive bool) (*KeyValueCache) {
+func CreateKeyValueCache(addr string, keepAlive bool) *KeyValueCache {
     kv := new(KeyValueCache)
     kv.Initialize(addr, keepAlive)
     return kv
@@ -146,7 +146,7 @@ func onKeyValueMsgRet(controller nnet.Controller, _ string, msg codecs.IMData) e
     return nil
 }
 
-func (receiver *KeyValueCache) Initialize(addr string, keepAlive bool) (error) {
+func (receiver *KeyValueCache) Initialize(addr string, keepAlive bool) error {
     receiver.addr = addr
     receiver.keepAlive = keepAlive
     receiver.lookupChan = make(chan interface{}, 10240)
@@ -214,7 +214,7 @@ func (receiver *KeyValueCache) GetValue(key string) (interface{}, error) {
     return receiver.execCmd(KeyValueCmdGet, key, "")
 }
 
-func (receiver *KeyValueCache) GetString(key string, def string) (string) {
+func (receiver *KeyValueCache) GetString(key string, def string) string {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         rstr, ok := r.(string)
@@ -227,7 +227,7 @@ func (receiver *KeyValueCache) GetString(key string, def string) (string) {
     return def
 }
 
-func (receiver *KeyValueCache) GetInt(key string, def int) (int) {
+func (receiver *KeyValueCache) GetInt(key string, def int) int {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         i := convertToInt64(r, int64(def))
@@ -236,7 +236,7 @@ func (receiver *KeyValueCache) GetInt(key string, def int) (int) {
     return def
 }
 
-func (receiver *KeyValueCache) GetInt8(key string, def int8) (int8) {
+func (receiver *KeyValueCache) GetInt8(key string, def int8) int8 {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         i := convertToInt64(r, int64(def))
@@ -245,7 +245,7 @@ func (receiver *KeyValueCache) GetInt8(key string, def int8) (int8) {
     return def
 }
 
-func (receiver *KeyValueCache) GetInt16(key string, def int16) (int16) {
+func (receiver *KeyValueCache) GetInt16(key string, def int16) int16 {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         i := convertToInt64(r, int64(def))
@@ -254,7 +254,7 @@ func (receiver *KeyValueCache) GetInt16(key string, def int16) (int16) {
     return def
 }
 
-func (receiver *KeyValueCache) GetInt32(key string, def int32) (int32) {
+func (receiver *KeyValueCache) GetInt32(key string, def int32) int32 {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         i := convertToInt64(r, int64(def))
@@ -263,7 +263,7 @@ func (receiver *KeyValueCache) GetInt32(key string, def int32) (int32) {
     return def
 }
 
-func (receiver *KeyValueCache) GetInt64(key string, def int64) (int64) {
+func (receiver *KeyValueCache) GetInt64(key string, def int64) int64 {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         i := convertToInt64(r, int64(def))
@@ -272,7 +272,7 @@ func (receiver *KeyValueCache) GetInt64(key string, def int64) (int64) {
     return def
 }
 
-func (receiver *KeyValueCache) GetUint(key string, def uint) (uint) {
+func (receiver *KeyValueCache) GetUint(key string, def uint) uint {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         i := convertToInt64(r, int64(def))
@@ -281,7 +281,7 @@ func (receiver *KeyValueCache) GetUint(key string, def uint) (uint) {
     return def
 }
 
-func (receiver *KeyValueCache) GetUint8(key string, def uint8) (uint8) {
+func (receiver *KeyValueCache) GetUint8(key string, def uint8) uint8 {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         i := convertToInt64(r, int64(def))
@@ -290,7 +290,7 @@ func (receiver *KeyValueCache) GetUint8(key string, def uint8) (uint8) {
     return def
 }
 
-func (receiver *KeyValueCache) GetUint16(key string, def uint16) (uint16) {
+func (receiver *KeyValueCache) GetUint16(key string, def uint16) uint16 {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         i := convertToInt64(r, int64(def))
@@ -299,7 +299,7 @@ func (receiver *KeyValueCache) GetUint16(key string, def uint16) (uint16) {
     return def
 }
 
-func (receiver *KeyValueCache) GetUint32(key string, def uint32) (uint32) {
+func (receiver *KeyValueCache) GetUint32(key string, def uint32) uint32 {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         i := convertToInt64(r, int64(def))
@@ -308,7 +308,7 @@ func (receiver *KeyValueCache) GetUint32(key string, def uint32) (uint32) {
     return def
 }
 
-func (receiver *KeyValueCache) GetUint64(key string, def uint64) (uint64) {
+func (receiver *KeyValueCache) GetUint64(key string, def uint64) uint64 {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         i := convertToInt64(r, int64(def))
@@ -317,7 +317,7 @@ func (receiver *KeyValueCache) GetUint64(key string, def uint64) (uint64) {
     return def
 }
 
-func (receiver *KeyValueCache) GetFloat32(key string, def float32) (float32) {
+func (receiver *KeyValueCache) GetFloat32(key string, def float32) float32 {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         ri, ok := r.(float32)
@@ -330,7 +330,7 @@ func (receiver *KeyValueCache) GetFloat32(key string, def float32) (float32) {
     return def
 }
 
-func (receiver *KeyValueCache) GetFloat64(key string, def float64) (float64) {
+func (receiver *KeyValueCache) GetFloat64(key string, def float64) float64 {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         ri, ok := r.(float64)
@@ -343,7 +343,7 @@ func (receiver *KeyValueCache) GetFloat64(key string, def float64) (float64) {
     return def
 }
 
-func (receiver *KeyValueCache) GetBool(key string) (bool) {
+func (receiver *KeyValueCache) GetBool(key string) bool {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         ri, ok := r.(bool)
@@ -356,7 +356,7 @@ func (receiver *KeyValueCache) GetBool(key string) (bool) {
     return false
 }
 
-func (receiver *KeyValueCache) GetMap(key string) (codecs.IMMap) {
+func (receiver *KeyValueCache) GetMap(key string) codecs.IMMap {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         ri, ok := r.(codecs.IMMap)
@@ -369,7 +369,7 @@ func (receiver *KeyValueCache) GetMap(key string) (codecs.IMMap) {
     return nil
 }
 
-func (receiver *KeyValueCache) GetSlice(key string) (codecs.IMSlice) {
+func (receiver *KeyValueCache) GetSlice(key string) codecs.IMSlice {
     r, err := receiver.execCmd(KeyValueCmdGet, key, nil)
     if err == nil {
         ri, ok := r.(codecs.IMSlice)
@@ -382,12 +382,12 @@ func (receiver *KeyValueCache) GetSlice(key string) (codecs.IMSlice) {
     return nil
 }
 
-func (receiver *KeyValueCache) SetValue(key string, value interface{}) (error) {
+func (receiver *KeyValueCache) SetValue(key string, value interface{}) error {
     _, err := receiver.execCmd(KeyValueCmdSet, key, value)
     return err
 }
 
-func (receiver *KeyValueCache) RemoveValue(key string) (error) {
+func (receiver *KeyValueCache) RemoveValue(key string) error {
     _, err := receiver.execCmd(KeyValueCmdDel, key, nil)
     return err
 }

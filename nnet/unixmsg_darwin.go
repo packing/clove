@@ -18,19 +18,19 @@
 package nnet
 
 import (
-    "net"
     "github.com/packing/nbpy/errors"
     "github.com/packing/nbpy/utils"
+    "net"
 )
 
 type UnixMsg struct {
-    controller     *UnixMsgController
-    isClosed       bool
+    controller *UnixMsgController
+    isClosed   bool
 
     associatedObject interface{}
 }
 
-func CreateUnixMsg() (*UnixMsg) {
+func CreateUnixMsg() *UnixMsg {
     s := new(UnixMsg)
     s.isClosed = true
     return s
@@ -40,7 +40,7 @@ func (receiver *UnixMsg) SetControllerAssociatedObject(o interface{}) {
     receiver.associatedObject = o
 }
 
-func (receiver *UnixMsg) Bind(addr string) (error) {
+func (receiver *UnixMsg) Bind(addr string) error {
     receiver.isClosed = true
     unixAddr, err := net.ResolveUnixAddr("unixgram", addr)
     if err != nil {
@@ -73,13 +73,12 @@ func (receiver *UnixMsg) processClient(conn net.UnixConn) {
 
 }
 
-func (receiver *UnixMsg) SendTo(addr string, fds...int) (error) {
+func (receiver *UnixMsg) SendTo(addr string, fds ...int) error {
     if receiver.isClosed {
         return errors.ErrorDataSentIncomplete
     }
     return receiver.controller.SendFdTo(addr, fds...)
 }
-
 
 func (receiver *UnixMsg) Close() {
     if !receiver.isClosed {

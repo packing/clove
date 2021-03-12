@@ -22,6 +22,5 @@ import "C"
 
 //export GoPrint
 func GoPrint(s *C.char) {
-	fmt.Println(C.GoString(s))
+    fmt.Println(C.GoString(s))
 }
-

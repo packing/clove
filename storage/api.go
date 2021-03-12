@@ -1,18 +1,18 @@
 package storage
 
 import (
-    "github.com/packing/nbpy/nnet"
-    "strings"
     "fmt"
-    "os"
-    "github.com/packing/nbpy/packets"
     "github.com/packing/nbpy/codecs"
-    "github.com/packing/nbpy/utils"
     "github.com/packing/nbpy/errors"
-    "time"
     "github.com/packing/nbpy/messages"
-    "sync"
+    "github.com/packing/nbpy/nnet"
+    "github.com/packing/nbpy/packets"
+    "github.com/packing/nbpy/utils"
     "math"
+    "os"
+    "strings"
+    "sync"
+    "time"
 )
 
 var CmdErrorRet = errors.Errorf("Storage timeout")
@@ -24,9 +24,9 @@ const (
 )
 
 type Transaction struct {
-    sql string
+    sql    string
     action int
-    args []interface{}
+    args   []interface{}
 }
 
 type ResultWaiter struct {
@@ -36,17 +36,17 @@ type ResultWaiter struct {
 }
 
 type Client struct {
-    udpUnix    *nnet.UnixUDP
-    tcpNormal  *nnet.TCPClient
-    addr       string
-    unixMode   bool
-    lock       sync.Mutex
-    timeOut    time.Duration
-    waiters    *sync.Map
-    uniqueId   int64
+    udpUnix   *nnet.UnixUDP
+    tcpNormal *nnet.TCPClient
+    addr      string
+    unixMode  bool
+    lock      sync.Mutex
+    timeOut   time.Duration
+    waiters   *sync.Map
+    uniqueId  int64
 }
 
-func CreateClient(addr string, timeOut time.Duration) (*Client) {
+func CreateClient(addr string, timeOut time.Duration) *Client {
     kv := new(Client)
     kv.timeOut = timeOut
     kv.waiters = new(sync.Map)
@@ -105,7 +105,7 @@ func (receiver *Client) delWaiter(cmdId int64, fn func(*ResultWaiter)) {
     }
 }
 
-func (receiver *Client) execWaiter(cmdId int64,fn func(*ResultWaiter)) bool {
+func (receiver *Client) execWaiter(cmdId int64, fn func(*ResultWaiter)) bool {
     w, ok := receiver.waiters.Load(cmdId)
     if ok {
         v, ok := w.(ResultWaiter)
@@ -142,7 +142,7 @@ func (receiver *Client) onKeyValueMsgRet(controller nnet.Controller, _ string, m
     return nil
 }
 
-func (receiver *Client) Initialize(addr string) (error) {
+func (receiver *Client) Initialize(addr string) error {
     receiver.addr = addr
     //receiver.lookupChan = make(chan interface{}, 10240)
     if strings.Contains(addr, ":") {
@@ -183,7 +183,7 @@ func (receiver *Client) sendCmdWithRet(cmdData codecs.IMMap) (interface{}, error
 
     tr := time.NewTimer(receiver.timeOut)
     go func() {
-        <- tr.C
+        <-tr.C
         receiver.delWaiter(cmdId, func(waiter *ResultWaiter) {
             if waiter != nil {
                 go func() {
@@ -203,7 +203,7 @@ func (receiver *Client) sendCmdWithRet(cmdData codecs.IMMap) (interface{}, error
         receiver.tcpNormal.Send(cmdData)
     }
 
-    ret, ok := <- recvChan
+    ret, ok := <-recvChan
     if ok {
         close(recvChan)
         return ret, nil
@@ -233,8 +233,7 @@ func (receiver *Client) sendCmdWithRetNotTimeout(cmdData codecs.IMMap) (interfac
         receiver.tcpNormal.Send(cmdData)
     }
 
-
-    ret, ok := <- recvChan
+    ret, ok := <-recvChan
     if ok {
         close(recvChan)
         return ret, nil
@@ -253,7 +252,7 @@ func (receiver *Client) sendCmdWithoutRet(cmdData codecs.IMMap) error {
     return nil
 }
 
-func (receiver *Client) DBQuery(sql string, args ...interface{}) ([] interface{}, error) {
+func (receiver *Client) DBQuery(sql string, args ...interface{}) ([]interface{}, error) {
     msg := make(codecs.IMMap)
     msg[messages.ProtocolKeyScheme] = messages.ProtocolSchemeS2S
     msg[messages.ProtocolKeyTag] = codecs.IMSlice{messages.ProtocolTagStorage}
@@ -267,7 +266,7 @@ func (receiver *Client) DBQuery(sql string, args ...interface{}) ([] interface{}
 
     ret, err := receiver.sendCmdWithRet(msg)
     if err == nil {
-        retV, ok := ret.([] interface{})
+        retV, ok := ret.([]interface{})
         if ok {
             return retV, nil
         } else {
@@ -397,7 +396,7 @@ func (receiver *Client) RedisDo(cmd string, args ...interface{}) interface{} {
 
     ret, err := receiver.sendCmdWithRet(msg)
     if err == nil {
-        retV, ok := ret.(map[interface{}] interface{})
+        retV, ok := ret.(map[interface{}]interface{})
         if ok {
             m := codecs.CreateMapReader(retV)
             return m.TryReadValue(messages.ProtocolKeyResult)
@@ -470,7 +469,7 @@ func (receiver *Client) RedisReceive(key uint64) interface{} {
 
     ret, err := receiver.sendCmdWithRet(msg)
     if err == nil {
-        retV, ok := ret.(map[interface{}] interface{})
+        retV, ok := ret.(map[interface{}]interface{})
         if ok {
             m := codecs.CreateMapReader(retV)
             return m.TryReadValue(messages.ProtocolKeyResult)

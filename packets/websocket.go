@@ -20,14 +20,14 @@ package packets
 import (
     "bufio"
     "bytes"
-    "fmt"
-    "strings"
     "crypto/sha1"
     "encoding/base64"
     "encoding/binary"
+    "fmt"
+    "github.com/packing/nbpy/bits"
+    "strings"
     //
     "net/http"
-    "github.com/packing/nbpy/bits"
     //
     "github.com/packing/nbpy/codecs"
     "github.com/packing/nbpy/errors"
@@ -195,7 +195,7 @@ func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
         }
     }
 
-    totalLen := headlen + int(dataLen & 0xFFFFFFFF)
+    totalLen := headlen + int(dataLen&0xFFFFFFFF)
     if len(in) < totalLen {
         return errors.ErrorDataNotReady, nil, 0
     }

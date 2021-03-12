@@ -17,32 +17,31 @@
 
 package packets
 
-const PacketMaxLength 	= 0xFFFFFF
+const PacketMaxLength = 0xFFFFFF
 
 type Packet struct {
-	Encrypted bool
-	Compressed bool
-	ProtocolType byte
-	ProtocolVer byte
-	CompressSupport bool
-	Raw []byte
+    Encrypted       bool
+    Compressed      bool
+    ProtocolType    byte
+    ProtocolVer     byte
+    CompressSupport bool
+    Raw             []byte
 }
 
 type PacketParser interface {
-	TryParse([]byte) (error, bool)
-	Prepare([]byte) (error, int, byte, byte, []byte)
-	Pop([]byte) (error, *Packet, int)
+    TryParse([]byte) (error, bool)
+    Prepare([]byte) (error, int, byte, byte, []byte)
+    Pop([]byte) (error, *Packet, int)
 }
 
 type PacketPackager interface {
-	Package(*Packet, []byte) (error, []byte)
+    Package(*Packet, []byte) (error, []byte)
 }
 
-
 type PacketFormat struct {
-	Tag string
-	Priority int
-	UnixNeed bool
-	Parser PacketParser
-	Packager PacketPackager
+    Tag      string
+    Priority int
+    UnixNeed bool
+    Parser   PacketParser
+    Packager PacketPackager
 }

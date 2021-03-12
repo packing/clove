@@ -18,76 +18,71 @@
 package nnet
 
 import (
-    "fmt"
-    "github.com/packing/nbpy/codecs"
     "github.com/packing/nbpy/errors"
-    "github.com/packing/nbpy/packets"
     "github.com/packing/nbpy/utils"
     "net"
 )
 
-type UDP struct {
-    DataController
-    Codec          *codecs.Codec
-    Format         *packets.PacketFormat
-    dataNotifyChan chan int
-    controller     *UDPController
-    isClosed       bool
+type UnixMsg struct {
+    controller *UnixMsgController
+    isClosed   bool
+
+    associatedObject interface{}
 }
 
-func CreateUDP(format *packets.PacketFormat, codec *codecs.Codec) *UDP {
-    s := new(UDP)
-    s.Codec = codec
-    s.Format = format
+func CreateUnixMsg() *UnixMsg {
+    s := new(UnixMsg)
     s.isClosed = true
     return s
 }
 
-func (receiver *UDP) Bind(addr string, port int) error {
+func (receiver *UnixMsg) SetControllerAssociatedObject(o interface{}) {
+    receiver.associatedObject = o
+}
+
+func (receiver *UnixMsg) Bind(addr string) error {
     receiver.isClosed = true
-    address := fmt.Sprintf("%s:%d", addr, port)
-    udpAddr, err := net.ResolveUDPAddr("udp", address)
+    unixAddr, err := net.ResolveUnixAddr("unixgram", addr)
     if err != nil {
         return err
     }
 
-    udpConn, err := net.ListenUDP("udp", udpAddr)
+    unixConn, err := net.ListenUnixgram("unixgram", unixAddr)
     if err != nil {
         return err
     }
 
     receiver.isClosed = false
-    receiver.processClient(*udpConn)
+    receiver.processClient(*unixConn)
 
     return nil
 }
 
-func (receiver *UDP) processClient(conn net.UDPConn) {
+func (receiver *UnixMsg) processClient(conn net.UnixConn) {
+    receiver.controller = createUnixMsgController(conn)
+    receiver.controller.SetAssociatedObject(receiver.associatedObject)
 
-    dataRW := createDataReadWriter(receiver.Codec, receiver.Format)
-    dataRW.OnDataDecoded = receiver.OnDataDecoded
-    receiver.controller = createUDPController(conn, dataRW)
     receiver.controller.OnStop = func(controller Controller) error {
-        utils.LogInfo("udp端口 %s 已经退出监听", controller.GetSessionID())
-        //receiver.controller = nil
+        utils.LogInfo(">>> unix消息端口 %d 已经退出监听", controller.GetSessionID())
+        receiver.controller = nil
+        receiver.isClosed = true
         return nil
     }
+
     receiver.controller.Schedule()
 
 }
 
-func (receiver *UDP) SendTo(addr string, port int, msgs ...codecs.IMData) ([]codecs.IMData, error) {
+func (receiver *UnixMsg) SendTo(addr string, fds ...int) error {
     if receiver.isClosed {
-        return msgs, errors.ErrorDataSentIncomplete
+        return errors.ErrorDataSentIncomplete
     }
-    address := fmt.Sprintf("%s:%d", addr, port)
-    return receiver.controller.SendTo(address, msgs...)
+    return receiver.controller.SendFdTo(addr, fds...)
 }
 
-func (receiver *UDP) Close() {
+func (receiver *UnixMsg) Close() {
     if !receiver.isClosed {
         receiver.controller.Close()
-        //receiver.controller = nil
         receiver.isClosed = true
     }
 }
