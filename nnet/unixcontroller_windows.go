@@ -21,7 +21,6 @@ import (
     "github.com/packing/nbpy/codecs"
     "github.com/packing/nbpy/errors"
     "net"
-    "sync"
 )
 
 type UnixController struct {
@@ -42,7 +41,7 @@ func (receiver *UnixController) SetAssociatedObject(o interface{}) { }
 
 func (receiver *UnixController) GetAssociatedObject() interface{} { return nil }
 
-func (receiver UnixController) GetSource() string { return nil }
+func (receiver UnixController) GetSource() string { return "" }
 
 func (receiver UnixController) GetSessionID() SessionID { return SessionID(0) }
 
@@ -64,18 +63,8 @@ func (receiver UnixController) ReadFrom() (string, []byte, int) { return "", nil
 
 func (receiver *UnixController) WriteTo(addr string, data []byte) { }
 
-func (receiver *UnixController) clearSendBuffer(addr string) { }
-
 func (receiver *UnixController) SendTo(addr string, msg ...codecs.IMData) ([]codecs.IMData, error) { return nil, nil }
 
 func (receiver UnixController) SendFdTo(addr string, fds ...int) error { return nil }
-
-func (receiver *UnixController) processData(group *sync.WaitGroup) { }
-
-func (receiver *UnixController) processRead(group *sync.WaitGroup) { }
-
-func (receiver *UnixController) innerProcessWrite(uData UnixDatagram) error { return nil }
-
-func (receiver *UnixController) processWrite(wg *sync.WaitGroup) { }
 
 func (receiver *UnixController) Schedule() { }

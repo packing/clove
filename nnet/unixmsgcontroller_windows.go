@@ -21,7 +21,6 @@ import (
     "github.com/packing/nbpy/codecs"
     "github.com/packing/nbpy/errors"
     "net"
-    "sync"
 )
 
 type UnixMsgController struct {
@@ -48,7 +47,7 @@ func (receiver *UnixMsgController) GetTag() int {
 }
 
 func (receiver UnixMsgController) GetSource() string {
-    return nil
+    return ""
 }
 
 func (receiver UnixMsgController) GetSessionID() SessionID {
@@ -86,17 +85,10 @@ func (receiver UnixMsgController) ReadFrom() (string, []byte, int) {
 func (receiver *UnixMsgController) WriteTo(addr string, data []byte) {
 }
 
-func (receiver *UnixMsgController) clearSendBuffer(addr string) {
-}
-
 func (receiver *UnixMsgController) SendTo(addr string, msg ...codecs.IMData) ([]codecs.IMData, error) {
     return nil, nil
 }
 
 func (receiver UnixMsgController) SendFdTo(addr string, fds ...int) error { return nil }
-
-func (receiver *UnixMsgController) processData(group *sync.WaitGroup) { }
-
-func (receiver *UnixMsgController) processRead(group *sync.WaitGroup) { }
 
 func (receiver *UnixMsgController) Schedule() { }

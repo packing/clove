@@ -20,7 +20,6 @@ package nnet
 import (
     "github.com/packing/nbpy/codecs"
     "github.com/packing/nbpy/packets"
-    "net"
 )
 
 type UnixUDP struct {
@@ -44,10 +43,7 @@ func (receiver *UnixUDP) Bind(addr string) error {
 }
 
 func (receiver UnixUDP) GetBindAddr() string {
-    return nil
-}
-
-func (receiver *UnixUDP) processClient(conn net.UnixConn) {
+    return ""
 }
 
 func (receiver *UnixUDP) SendTo(addr string, msgs ...codecs.IMData) ([]codecs.IMData, error) {
