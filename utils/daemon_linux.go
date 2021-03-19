@@ -28,7 +28,7 @@ import (
 
 func Daemon() {
     argvs := os.Args[1:]
-    argvs = append(argvs, "-s")
+    //argvs = append(argvs, "-s")
     cmd := exec.Command(os.Args[0], argvs...)
     cmd.Stdin = nil
     cmd.Stdout = nil
