@@ -17,41 +17,41 @@
 
 package modules
 
-import "github.com/packing/nbpy/nnet"
+import "github.com/packing/clove/nnet"
 
 const (
-    TunnelDirect = 1
-    TunnelUPNP   = 2
-    TunnelStun   = 4
-    TunnelAll    = TunnelDirect | TunnelUPNP | TunnelStun
+	TunnelDirect = 1
+	TunnelUPNP   = 2
+	TunnelStun   = 4
+	TunnelAll    = TunnelDirect | TunnelUPNP | TunnelStun
 )
 
 type PeerInfo struct {
-    AddrWAN    string
-    PortWAN    string
-    PortLAN    string
-    TunnelType int
+	AddrWAN    string
+	PortWAN    string
+	PortLAN    string
+	TunnelType int
 }
 
 type Peer struct {
-    io         *nnet.UDP
-    local      PeerInfo
-    trustPeers []PeerInfo
-    peers      map[nnet.SessionID]PeerInfo
+	io         *nnet.UDP
+	local      PeerInfo
+	trustPeers []PeerInfo
+	peers      map[nnet.SessionID]PeerInfo
 }
 
 func (receiver *Peer) Init() error {
-    return receiver.InitWithTunnelType(TunnelAll)
+	return receiver.InitWithTunnelType(TunnelAll)
 }
 
 func (receiver *Peer) InitWithTunnelType(tunnels int) error {
-    if tunnels&TunnelDirect == TunnelDirect {
-        //尝试直接连接可能性
+	if tunnels&TunnelDirect == TunnelDirect {
+		//尝试直接连接可能性
 
-    }
-    return nil
+	}
+	return nil
 }
 
 func (receiver *Peer) tryDirectConnect() error {
-    return nil
+	return nil
 }

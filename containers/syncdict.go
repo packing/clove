@@ -1,178 +1,195 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package containers
 
 import (
-    "sync"
+	"sync"
 )
 
 type KeyValue struct {
-    Key   interface{}
-    Value interface{}
+	Key   interface{}
+	Value interface{}
 }
 
 type SyncDict interface {
-    Set(key, value interface{})
-    Get(key interface{}) interface{}
+	Set(key, value interface{})
+	Get(key interface{}) interface{}
 
-    Pop(key interface{}) interface{}
-    Clear()
+	Pop(key interface{}) interface{}
+	Clear()
 
-    HasKey(key interface{}) bool
+	HasKey(key interface{}) bool
 
-    Count() int
+	Count() int
 
-    Keys() []interface{}
-    Values() []interface{}
-    Items() []KeyValue
+	Keys() []interface{}
+	Values() []interface{}
+	Items() []KeyValue
 
-    IterItems() <-chan KeyValue
+	IterItems() <-chan KeyValue
 }
 
 type dict struct {
-    m     map[interface{}]interface{}
-    rw    sync.RWMutex
-    block bool
+	m     map[interface{}]interface{}
+	rw    sync.RWMutex
+	block bool
 }
 
 func New(block bool) SyncDict {
-    var sm = &dict{}
-    sm.block = block
-    sm.m = make(map[interface{}]interface{})
-    return sm
+	var sm = &dict{}
+	sm.block = block
+	sm.m = make(map[interface{}]interface{})
+	return sm
 }
 
 func NewSync() SyncDict {
-    return New(true)
+	return New(true)
 }
 
 func NewAsync() SyncDict {
-    return New(false)
+	return New(false)
 }
 
 func (d *dict) lock() {
-    if d.block {
-        d.rw.Lock()
-    }
+	if d.block {
+		d.rw.Lock()
+	}
 }
 
 func (d *dict) unlock() {
-    if d.block {
-        d.rw.Unlock()
-    }
+	if d.block {
+		d.rw.Unlock()
+	}
 }
 
 func (d *dict) rLock() {
-    if d.block {
-        d.rw.RLock()
-    }
+	if d.block {
+		d.rw.RLock()
+	}
 }
 
 func (d *dict) rUnlock() {
-    if d.block {
-        d.rw.RUnlock()
-    }
+	if d.block {
+		d.rw.RUnlock()
+	}
 }
 
 func (d *dict) Set(key, value interface{}) {
-    d.lock()
-    defer d.unlock()
+	d.lock()
+	defer d.unlock()
 
-    d.m[key] = value
+	d.m[key] = value
 }
 
 func (d *dict) Pop(key interface{}) interface{} {
-    d.lock()
-    defer d.unlock()
+	d.lock()
+	defer d.unlock()
 
-    val, _ := d.m[key]
-    delete(d.m, key)
-    return val
+	val, _ := d.m[key]
+	delete(d.m, key)
+	return val
 }
 
 func (d *dict) Clear() {
-    d.lock()
-    defer d.unlock()
+	d.lock()
+	defer d.unlock()
 
-    for k := range d.m {
-        delete(d.m, k)
-    }
+	for k := range d.m {
+		delete(d.m, k)
+	}
 }
 
 func (d *dict) HasKey(key interface{}) bool {
-    d.rLock()
-    defer d.rUnlock()
+	d.rLock()
+	defer d.rUnlock()
 
-    _, ok := d.m[key]
-    return ok
+	_, ok := d.m[key]
+	return ok
 }
 
 func (d *dict) GetWithDefault(key interface{}, def interface{}) interface{} {
-    d.rLock()
-    defer d.rUnlock()
+	d.rLock()
+	defer d.rUnlock()
 
-    v, ok := d.m[key]
-    if !ok {
-        return def
-    }
-    return v
+	v, ok := d.m[key]
+	if !ok {
+		return def
+	}
+	return v
 }
 
 func (d *dict) Get(key interface{}) interface{} {
-    return d.GetWithDefault(key, nil)
+	return d.GetWithDefault(key, nil)
 }
 
 func (d *dict) Count() int {
-    d.rLock()
-    defer d.rUnlock()
+	d.rLock()
+	defer d.rUnlock()
 
-    return len(d.m)
+	return len(d.m)
 }
 
 func (d *dict) Keys() []interface{} {
-    d.rLock()
-    defer d.rUnlock()
+	d.rLock()
+	defer d.rUnlock()
 
-    var keys = make([]interface{}, 0, 0)
-    for k := range d.m {
-        keys = append(keys, k)
-    }
-    return keys
+	var keys = make([]interface{}, 0, 0)
+	for k := range d.m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 func (d *dict) Values() []interface{} {
-    d.rLock()
-    defer d.rUnlock()
+	d.rLock()
+	defer d.rUnlock()
 
-    var values = make([]interface{}, 0, 0)
-    for _, v := range d.m {
-        values = append(values, v)
-    }
-    return values
+	var values = make([]interface{}, 0, 0)
+	for _, v := range d.m {
+		values = append(values, v)
+	}
+	return values
 }
 
 func (d *dict) IterItems() <-chan KeyValue {
-    var iv = make(chan KeyValue)
+	var iv = make(chan KeyValue)
 
-    go func(sd *dict) {
-        sd.rLock()
-        defer sd.rUnlock()
+	go func(sd *dict) {
+		sd.rLock()
+		defer sd.rUnlock()
 
-        for k, v := range sd.m {
-            iv <- KeyValue{k, v}
-        }
+		for k, v := range sd.m {
+			iv <- KeyValue{k, v}
+		}
 
-        close(iv)
-    }(d)
+		close(iv)
+	}(d)
 
-    return iv
+	return iv
 }
 
 func (d *dict) Items() []KeyValue {
-    d.rLock()
-    defer d.rUnlock()
+	d.rLock()
+	defer d.rUnlock()
 
-    var kvs = make([]KeyValue, 0, 0)
-    for k, v := range d.m {
-        kvs = append(kvs, KeyValue{k, v})
-    }
-    return kvs
+	var kvs = make([]KeyValue, 0, 0)
+	for k, v := range d.m {
+		kvs = append(kvs, KeyValue{k, v})
+	}
+	return kvs
 }

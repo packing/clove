@@ -18,40 +18,40 @@
 package nnet
 
 import (
-    "github.com/packing/nbpy/codecs"
-    "github.com/packing/nbpy/packets"
+	"github.com/packing/clove/codecs"
+	"github.com/packing/clove/packets"
 )
 
 type UnixUDP struct {
-    DataController
-    Codec          *codecs.Codec
-    Format         *packets.PacketFormat
+	DataController
+	Codec  *codecs.Codec
+	Format *packets.PacketFormat
 }
 
 func CreateUnixUDPWithFormat(format *packets.PacketFormat, codec *codecs.Codec) *UnixUDP {
-    s := new(UnixUDP)
-    s.Codec = codec
-    s.Format = format
-    return s
+	s := new(UnixUDP)
+	s.Codec = codec
+	s.Format = format
+	return s
 }
 
 func (receiver *UnixUDP) SetControllerAssociatedObject(o interface{}) {
 }
 
 func (receiver *UnixUDP) Bind(addr string) error {
-    return nil
+	return nil
 }
 
 func (receiver UnixUDP) GetBindAddr() string {
-    return ""
+	return ""
 }
 
 func (receiver *UnixUDP) SendTo(addr string, msgs ...codecs.IMData) ([]codecs.IMData, error) {
-    return nil, nil
+	return nil, nil
 }
 
 func (receiver *UnixUDP) SendFileHandler(addr string, fds ...int) error {
-    return nil
+	return nil
 }
 
 func (receiver *UnixUDP) Close() {

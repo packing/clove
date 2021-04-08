@@ -18,40 +18,41 @@
 package nnet
 
 import (
-    "github.com/packing/nbpy/codecs"
-    "github.com/packing/nbpy/errors"
-    "net"
+	"net"
+
+	"github.com/packing/clove/codecs"
+	"github.com/packing/clove/errors"
 )
 
 type UnixMsgController struct {
-    OnStop  OnControllerStop
+	OnStop OnControllerStop
 }
 
 func createUnixMsgController(ioSrc net.UnixConn) *UnixMsgController {
-    sor := new(UnixMsgController)
-    return sor
+	sor := new(UnixMsgController)
+	return sor
 }
 
 func (receiver *UnixMsgController) SetAssociatedObject(o interface{}) {
 }
 
 func (receiver *UnixMsgController) GetAssociatedObject() interface{} {
-    return nil
+	return nil
 }
 
 func (receiver *UnixMsgController) SetTag(tag int) {
 }
 
 func (receiver *UnixMsgController) GetTag() int {
-    return 0
+	return 0
 }
 
 func (receiver UnixMsgController) GetSource() string {
-    return ""
+	return ""
 }
 
 func (receiver UnixMsgController) GetSessionID() SessionID {
-    return SessionID(0)
+	return SessionID(0)
 }
 
 func (receiver UnixMsgController) Close() {
@@ -64,31 +65,31 @@ func (receiver UnixMsgController) CloseOnSended() {
 }
 
 func (receiver UnixMsgController) Read(l int) ([]byte, int) {
-    return nil, 0
+	return nil, 0
 }
 
 func (receiver UnixMsgController) Peek(l int) ([]byte, int) {
-    return nil, 0
+	return nil, 0
 }
 
 func (receiver UnixMsgController) Write(data []byte) {
 }
 
 func (receiver UnixMsgController) Send(msg ...codecs.IMData) ([]codecs.IMData, error) {
-    return msg, errors.ErrorDataSentIncomplete
+	return msg, errors.ErrorDataSentIncomplete
 }
 
 func (receiver UnixMsgController) ReadFrom() (string, []byte, int) {
-    return "", nil, 0
+	return "", nil, 0
 }
 
 func (receiver *UnixMsgController) WriteTo(addr string, data []byte) {
 }
 
 func (receiver *UnixMsgController) SendTo(addr string, msg ...codecs.IMData) ([]codecs.IMData, error) {
-    return nil, nil
+	return nil, nil
 }
 
 func (receiver UnixMsgController) SendFdTo(addr string, fds ...int) error { return nil }
 
-func (receiver *UnixMsgController) Schedule() { }
+func (receiver *UnixMsgController) Schedule() {}

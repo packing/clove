@@ -18,26 +18,27 @@
 package nnet
 
 import (
-    "github.com/packing/nbpy/codecs"
-    "github.com/packing/nbpy/errors"
-    "net"
+	"net"
+
+	"github.com/packing/clove/codecs"
+	"github.com/packing/clove/errors"
 )
 
 type UnixController struct {
-    OnStop     OnControllerStop
-    DataRW     *DataReadWriter
+	OnStop OnControllerStop
+	DataRW *DataReadWriter
 }
 
 func createUnixController(ioSrc net.UnixConn, dataRW *DataReadWriter) *UnixController {
-    sor := new(UnixController)
-    return sor
+	sor := new(UnixController)
+	return sor
 }
 
 func (receiver *UnixController) SetTag(tag int) {}
 
 func (receiver *UnixController) GetTag() int { return 0 }
 
-func (receiver *UnixController) SetAssociatedObject(o interface{}) { }
+func (receiver *UnixController) SetAssociatedObject(o interface{}) {}
 
 func (receiver *UnixController) GetAssociatedObject() interface{} { return nil }
 
@@ -45,11 +46,11 @@ func (receiver UnixController) GetSource() string { return "" }
 
 func (receiver UnixController) GetSessionID() SessionID { return SessionID(0) }
 
-func (receiver UnixController) Close() { }
+func (receiver UnixController) Close() {}
 
-func (receiver UnixController) Discard() { }
+func (receiver UnixController) Discard() {}
 
-func (receiver UnixController) CloseOnSended() { }
+func (receiver UnixController) CloseOnSended() {}
 
 func (receiver UnixController) Read(l int) ([]byte, int) { return nil, 0 }
 
@@ -57,14 +58,18 @@ func (receiver UnixController) Peek(l int) ([]byte, int) { return nil, 0 }
 
 func (receiver UnixController) Write(data []byte) {}
 
-func (receiver UnixController) Send(msg ...codecs.IMData) ([]codecs.IMData, error) { return msg, errors.ErrorDataSentIncomplete }
+func (receiver UnixController) Send(msg ...codecs.IMData) ([]codecs.IMData, error) {
+	return msg, errors.ErrorDataSentIncomplete
+}
 
 func (receiver UnixController) ReadFrom() (string, []byte, int) { return "", nil, 0 }
 
-func (receiver *UnixController) WriteTo(addr string, data []byte) { }
+func (receiver *UnixController) WriteTo(addr string, data []byte) {}
 
-func (receiver *UnixController) SendTo(addr string, msg ...codecs.IMData) ([]codecs.IMData, error) { return nil, nil }
+func (receiver *UnixController) SendTo(addr string, msg ...codecs.IMData) ([]codecs.IMData, error) {
+	return nil, nil
+}
 
 func (receiver UnixController) SendFdTo(addr string, fds ...int) error { return nil }
 
-func (receiver *UnixController) Schedule() { }
+func (receiver *UnixController) Schedule() {}

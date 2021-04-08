@@ -18,10 +18,11 @@
 package packets
 
 import (
-    "bytes"
-    "encoding/binary"
-    "github.com/packing/nbpy/codecs"
-    "github.com/packing/nbpy/errors"
+	"bytes"
+	"encoding/binary"
+
+	"github.com/packing/clove/codecs"
+	"github.com/packing/clove/errors"
 )
 
 /*
@@ -35,13 +36,13 @@ compress-data 			-> memory (final-packet-size - sizeof(packet-header))
 }
 */
 const (
-    PacketNBHeaderLength  = 5
-    MaskNB                = 0x80
-    MaskNBCompressSupport = 0x1
-    MaskNBEncrypt         = 0x1 << 1
-    MaskNBCompressed      = 0x1 << 2
-    MaskNBReserved        = 0x1 << 3
-    MaskNBFeature         = MaskNBReserved | MaskNB
+	PacketNBHeaderLength  = 5
+	MaskNB                = 0x80
+	MaskNBCompressSupport = 0x1
+	MaskNBEncrypt         = 0x1 << 1
+	MaskNBCompressed      = 0x1 << 2
+	MaskNBReserved        = 0x1 << 3
+	MaskNBFeature         = MaskNBReserved | MaskNB
 )
 
 type PacketParserNB struct {
@@ -51,98 +52,98 @@ type PacketPackagerNB struct {
 }
 
 func (receiver PacketParserNB) Prepare(in []byte) (error, int, byte, byte, []byte) {
-    return nil, 0, codecs.ProtocolIM, 2, nil
+	return nil, 0, codecs.ProtocolIM, 2, nil
 }
 
 func (receiver PacketParserNB) TryParse(in []byte) (error, bool) {
-    if len(in) < PacketNBHeaderLength {
-        return errors.ErrorDataNotReady, false
-    }
+	if len(in) < PacketNBHeaderLength {
+		return errors.ErrorDataNotReady, false
+	}
 
-    peekData := in
-    mask := peekData[0] & MaskNBFeature
-    pLen := binary.BigEndian.Uint32(peekData[1:PacketNBHeaderLength])
-    ptop := (pLen & 0xF0000000) >> 28
-    ptov := (pLen & 0xF000000) >> 24
-    pLen = pLen & PacketMaxLength
+	peekData := in
+	mask := peekData[0] & MaskNBFeature
+	pLen := binary.BigEndian.Uint32(peekData[1:PacketNBHeaderLength])
+	ptop := (pLen & 0xF0000000) >> 28
+	ptov := (pLen & 0xF000000) >> 24
+	pLen = pLen & PacketMaxLength
 
-    if ptop == 0 || ptov == 0 {
-        return errors.ErrorDataNotMatch, false
-    }
+	if ptop == 0 || ptov == 0 {
+		return errors.ErrorDataNotMatch, false
+	}
 
-    if pLen > PacketMaxLength || pLen < PacketNBHeaderLength {
-        return errors.ErrorDataNotMatch, false
-    }
+	if pLen > PacketMaxLength || pLen < PacketNBHeaderLength {
+		return errors.ErrorDataNotMatch, false
+	}
 
-    if mask != MaskNBFeature {
-        return errors.ErrorDataNotMatch, false
-    }
+	if mask != MaskNBFeature {
+		return errors.ErrorDataNotMatch, false
+	}
 
-    return nil, true
+	return nil, true
 }
 
 func (receiver PacketParserNB) Pop(in []byte) (error, *Packet, int) {
-    if len(in) < PacketNBHeaderLength {
-        return errors.ErrorDataNotReady, nil, 0
-    }
+	if len(in) < PacketNBHeaderLength {
+		return errors.ErrorDataNotReady, nil, 0
+	}
 
-    peekData := in
-    opFlag := peekData[0]
-    mask := opFlag & MaskNBFeature
-    packetLen := binary.BigEndian.Uint32(peekData[1:PacketNBHeaderLength])
-    ptop := byte((packetLen & 0xF0000000) >> 28)
-    ptov := byte((packetLen & 0xF000000) >> 24)
-    packetLen = packetLen & PacketMaxLength
+	peekData := in
+	opFlag := peekData[0]
+	mask := opFlag & MaskNBFeature
+	packetLen := binary.BigEndian.Uint32(peekData[1:PacketNBHeaderLength])
+	ptop := byte((packetLen & 0xF0000000) >> 28)
+	ptov := byte((packetLen & 0xF000000) >> 24)
+	packetLen = packetLen & PacketMaxLength
 
-    if ptop == 0 || ptov == 0 {
-        return errors.ErrorDataIsDamage, nil, 0
-    }
+	if ptop == 0 || ptov == 0 {
+		return errors.ErrorDataIsDamage, nil, 0
+	}
 
-    if packetLen > PacketMaxLength || packetLen < PacketNBHeaderLength {
-        return errors.ErrorDataIsDamage, nil, 0
-    }
+	if packetLen > PacketMaxLength || packetLen < PacketNBHeaderLength {
+		return errors.ErrorDataIsDamage, nil, 0
+	}
 
-    if mask != MaskNBFeature {
-        return errors.ErrorDataIsDamage, nil, 0
-    }
+	if mask != MaskNBFeature {
+		return errors.ErrorDataIsDamage, nil, 0
+	}
 
-    if uint(packetLen) > uint(len(in)) {
-        return errors.ErrorDataNotReady, nil, 0
-    }
+	if uint(packetLen) > uint(len(in)) {
+		return errors.ErrorDataNotReady, nil, 0
+	}
 
-    packet := new(Packet)
-    packet.Compressed = (opFlag & MaskNBCompressed) == MaskNBCompressed
-    packet.Encrypted = (opFlag & MaskNBEncrypt) == MaskNBEncrypt
-    packet.CompressSupport = (opFlag & MaskNBCompressSupport) == MaskNBCompressSupport
-    packet.ProtocolType = ptop
-    packet.ProtocolVer = ptov
-    packet.Raw = peekData[PacketNBHeaderLength:packetLen]
+	packet := new(Packet)
+	packet.Compressed = (opFlag & MaskNBCompressed) == MaskNBCompressed
+	packet.Encrypted = (opFlag & MaskNBEncrypt) == MaskNBEncrypt
+	packet.CompressSupport = (opFlag & MaskNBCompressSupport) == MaskNBCompressSupport
+	packet.ProtocolType = ptop
+	packet.ProtocolVer = ptov
+	packet.Raw = peekData[PacketNBHeaderLength:packetLen]
 
-    return nil, packet, int(packetLen)
+	return nil, packet, int(packetLen)
 }
 
 func (receiver PacketPackagerNB) Package(pck *Packet, raw []byte) (error, []byte) {
-    header := make([]byte, PacketNBHeaderLength)
+	header := make([]byte, PacketNBHeaderLength)
 
-    var opFlag byte = 0
-    if pck.Compressed {
-        opFlag |= MaskNBCompressed
-    }
-    if pck.CompressSupport {
-        opFlag |= MaskNBCompressSupport
-    }
-    if pck.Encrypted {
-        opFlag |= MaskNBEncrypt
-    }
+	var opFlag byte = 0
+	if pck.Compressed {
+		opFlag |= MaskNBCompressed
+	}
+	if pck.CompressSupport {
+		opFlag |= MaskNBCompressSupport
+	}
+	if pck.Encrypted {
+		opFlag |= MaskNBEncrypt
+	}
 
-    header[0] = MaskNBFeature | opFlag
+	header[0] = MaskNBFeature | opFlag
 
-    packetLen := uint32(len(raw)) + PacketNBHeaderLength
-    ptoInfo := uint32((pck.ProtocolType<<4)|pck.ProtocolVer) << 24
-    packetLen |= ptoInfo
-    binary.BigEndian.PutUint32(header[1:], packetLen)
+	packetLen := uint32(len(raw)) + PacketNBHeaderLength
+	ptoInfo := uint32((pck.ProtocolType<<4)|pck.ProtocolVer) << 24
+	packetLen |= ptoInfo
+	binary.BigEndian.PutUint32(header[1:], packetLen)
 
-    return nil, bytes.Join([][]byte{header, raw}, []byte(""))
+	return nil, bytes.Join([][]byte{header, raw}, []byte(""))
 }
 
 var packetFormatNB = PacketFormat{Tag: "NBPyPacket", Priority: -998, UnixNeed: true, Parser: PacketParserNB{}, Packager: PacketPackagerNB{}}

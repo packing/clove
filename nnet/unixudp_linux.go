@@ -18,100 +18,101 @@
 package nnet
 
 import (
-    "github.com/packing/nbpy/codecs"
-    "github.com/packing/nbpy/errors"
-    "github.com/packing/nbpy/packets"
-    "github.com/packing/nbpy/utils"
-    "net"
-    "os"
+	"net"
+	"os"
+
+	"github.com/packing/clove/codecs"
+	"github.com/packing/clove/errors"
+	"github.com/packing/clove/packets"
+	"github.com/packing/clove/utils"
 )
 
 type UnixUDP struct {
-    DataController
-    Codec          *codecs.Codec
-    Format         *packets.PacketFormat
-    dataNotifyChan chan int
-    controller     *UnixController
-    isClosed       bool
-    addr           string
+	DataController
+	Codec          *codecs.Codec
+	Format         *packets.PacketFormat
+	dataNotifyChan chan int
+	controller     *UnixController
+	isClosed       bool
+	addr           string
 
-    associatedObject interface{}
+	associatedObject interface{}
 }
 
 func CreateUnixUDPWithFormat(format *packets.PacketFormat, codec *codecs.Codec) *UnixUDP {
-    s := new(UnixUDP)
-    s.Codec = codec
-    s.Format = format
-    s.isClosed = true
-    return s
+	s := new(UnixUDP)
+	s.Codec = codec
+	s.Format = format
+	s.isClosed = true
+	return s
 }
 
 func (receiver *UnixUDP) SetControllerAssociatedObject(o interface{}) {
-    receiver.associatedObject = o
+	receiver.associatedObject = o
 }
 
 func (receiver *UnixUDP) Bind(addr string) error {
-    receiver.isClosed = true
-    unixAddr, err := net.ResolveUnixAddr("unixgram", addr)
-    if err != nil {
-        return err
-    }
+	receiver.isClosed = true
+	unixAddr, err := net.ResolveUnixAddr("unixgram", addr)
+	if err != nil {
+		return err
+	}
 
-    unixConn, err := net.ListenUnixgram("unixgram", unixAddr)
-    if err != nil {
-        return err
-    }
+	unixConn, err := net.ListenUnixgram("unixgram", unixAddr)
+	if err != nil {
+		return err
+	}
 
-    receiver.addr = addr
-    receiver.isClosed = false
-    receiver.processClient(*unixConn)
+	receiver.addr = addr
+	receiver.isClosed = false
+	receiver.processClient(*unixConn)
 
-    return nil
+	return nil
 }
 
 func (receiver UnixUDP) GetBindAddr() string {
-    return receiver.addr
+	return receiver.addr
 }
 
 func (receiver *UnixUDP) processClient(conn net.UnixConn) {
 
-    dataRW := createDataReadWriter(receiver.Codec, receiver.Format)
-    dataRW.OnDataDecoded = receiver.OnDataDecoded
-    receiver.controller = createUnixController(conn, dataRW)
-    receiver.controller.SetAssociatedObject(receiver.associatedObject)
+	dataRW := createDataReadWriter(receiver.Codec, receiver.Format)
+	dataRW.OnDataDecoded = receiver.OnDataDecoded
+	receiver.controller = createUnixController(conn, dataRW)
+	receiver.controller.SetAssociatedObject(receiver.associatedObject)
 
-    receiver.controller.OnStop = func(controller Controller) error {
-        utils.LogInfo("unix端口 %s 已经退出监听", controller.GetSessionID())
-        receiver.controller = nil
-        receiver.isClosed = true
-        return nil
-    }
+	receiver.controller.OnStop = func(controller Controller) error {
+		utils.LogInfo("unix端口 %s 已经退出监听", controller.GetSessionID())
+		receiver.controller = nil
+		receiver.isClosed = true
+		return nil
+	}
 
-    receiver.controller.Schedule()
+	receiver.controller.Schedule()
 
 }
 
 func (receiver *UnixUDP) SendTo(addr string, msgs ...codecs.IMData) ([]codecs.IMData, error) {
-    if receiver.isClosed {
-        return msgs, errors.ErrorDataSentIncomplete
-    }
-    _, err := os.Stat(addr)
-    if err == nil || !os.IsNotExist(err) {
-        return receiver.controller.SendTo(addr, msgs...)
-    } else {
-        utils.LogError("无法向 %s 发送数据, 请确认它是否仍存在", addr)
-        return msgs, err
-    }
+	if receiver.isClosed {
+		return msgs, errors.ErrorDataSentIncomplete
+	}
+	_, err := os.Stat(addr)
+	if err == nil || !os.IsNotExist(err) {
+		return receiver.controller.SendTo(addr, msgs...)
+	} else {
+		utils.LogError("无法向 %s 发送数据, 请确认它是否仍存在", addr)
+		return msgs, err
+	}
 }
 
 func (receiver *UnixUDP) SendFileHandler(addr string, fds ...int) error {
-    return receiver.controller.SendFdTo(addr, fds...)
+	return receiver.controller.SendFdTo(addr, fds...)
 }
 
 func (receiver *UnixUDP) Close() {
-    if !receiver.isClosed {
-        //receiver.controller.Close()
-        receiver.controller.CloseOnSended()
-        receiver.isClosed = true
-    }
+	if !receiver.isClosed {
+		//receiver.controller.Close()
+		receiver.controller.CloseOnSended()
+		receiver.isClosed = true
+	}
 }

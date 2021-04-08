@@ -18,46 +18,47 @@
 package nnet
 
 import (
-    "github.com/packing/nbpy/codecs"
-    "math"
-    "sync"
+	"math"
+	"sync"
+
+	"github.com/packing/clove/codecs"
 )
 
 type Controller interface {
-    GetSource() string
-    GetSessionID() SessionID
-    Discard()
-    Read(int) ([]byte, int)
-    Peek(int) ([]byte, int)
-    Write([]byte)
-    Send(...codecs.IMData) ([]codecs.IMData, error)
-    ReadFrom() (string, []byte, int)
-    WriteTo(string, []byte)
-    SendTo(string, ...codecs.IMData) ([]codecs.IMData, error)
-    Close()
-    Schedule()
-    CloseOnSended()
-    GetAssociatedObject() interface{}
-    GetTag() int
-    SetTag(int)
+	GetSource() string
+	GetSessionID() SessionID
+	Discard()
+	Read(int) ([]byte, int)
+	Peek(int) ([]byte, int)
+	Write([]byte)
+	Send(...codecs.IMData) ([]codecs.IMData, error)
+	ReadFrom() (string, []byte, int)
+	WriteTo(string, []byte)
+	SendTo(string, ...codecs.IMData) ([]codecs.IMData, error)
+	Close()
+	Schedule()
+	CloseOnSended()
+	GetAssociatedObject() interface{}
+	GetTag() int
+	SetTag(int)
 }
 
 type SocketController struct {
-    OnWelcome func(Controller) error
-    OnBye     func(Controller) error
+	OnWelcome func(Controller) error
+	OnBye     func(Controller) error
 }
 
 type OnControllerStop func(Controller) error
 type OnControllerCome func(Controller) error
 
 type Server interface {
-    Lookup()
-    Boardcast(codecs.IMData)
-    Mutilcast([]SessionID, codecs.IMData)
+	Lookup()
+	Boardcast(codecs.IMData)
+	Mutilcast([]SessionID, codecs.IMData)
 }
 
 type FileHandleController interface {
-    OnFileHandleReceived(fd int) error
+	OnFileHandleReceived(fd int) error
 }
 
 type SessionID = uint64
@@ -88,105 +89,105 @@ var encodeCount int64 = 0
 var decodeCount int64 = 0
 
 func SetWebsocketDefaultCodec(codec *codecs.Codec) {
-    wsCodecDefault = codec
+	wsCodecDefault = codec
 }
 
 func IncEncodeTime(tv int64) {
-    encodeTime += tv
-    encodeCount += 1
+	encodeTime += tv
+	encodeCount += 1
 }
 
 func IncDecodeTime(tv int64) {
-    decodeTime += tv
-    decodeCount += 1
+	decodeTime += tv
+	decodeCount += 1
 }
 
 func GetEncodeAgvTime() int64 {
-    if encodeCount > 0 {
-        return encodeTime / encodeCount
-    }
-    return 0
+	if encodeCount > 0 {
+		return encodeTime / encodeCount
+	}
+	return 0
 }
 
 func GetDecodeAgvTime() int64 {
-    if decodeCount > 0 {
-        return decodeTime / decodeCount
-    }
-    return 0
+	if decodeCount > 0 {
+		return decodeTime / decodeCount
+	}
+	return 0
 }
 
 func GetDecodeInstanceCount() int {
-    mutex2.Lock()
-    defer mutex2.Unlock()
-    return decodeInstanceCount
+	mutex2.Lock()
+	defer mutex2.Unlock()
+	return decodeInstanceCount
 }
 
 func IncDecodeInstanceCount() {
-    mutex2.Lock()
-    defer mutex2.Unlock()
-    decodeInstanceCount += 1
+	mutex2.Lock()
+	defer mutex2.Unlock()
+	decodeInstanceCount += 1
 }
 
 func DecDecodeInstanceCount() {
-    mutex2.Lock()
-    defer mutex2.Unlock()
-    decodeInstanceCount -= 1
+	mutex2.Lock()
+	defer mutex2.Unlock()
+	decodeInstanceCount -= 1
 }
 
 func IncTotalTcpSendSize(s int) {
-    totalTcpSendSize += s
+	totalTcpSendSize += s
 }
 
 func IncTotalTcpRecvSize(s int) {
-    totalTcpRecvSize += s
+	totalTcpRecvSize += s
 }
 
 func GetTotalTcpSendSize() int {
-    return totalTcpSendSize
+	return totalTcpSendSize
 }
 
 func GetTotalTcpRecvSize() int {
-    return totalTcpRecvSize
+	return totalTcpRecvSize
 }
 
 func IncTotalUnixSendSize(s int) {
-    totalUnixSendSize += s
+	totalUnixSendSize += s
 }
 
 func IncTotalUnixRecvSize(s int) {
-    totalUnixRecvSize += s
+	totalUnixRecvSize += s
 }
 
 func GetTotalUnixSendSize() int {
-    return totalUnixSendSize
+	return totalUnixSendSize
 }
 
 func GetTotalUnixRecvSize() int {
-    return totalUnixRecvSize
+	return totalUnixRecvSize
 }
 
 func IncTotalHandleRecvSize(s int) {
-    totalHandleRecvSize += s
+	totalHandleRecvSize += s
 }
 
 func GetTotalHandleSendSize() int {
-    return totalHandleRecvSize
+	return totalHandleRecvSize
 }
 
 func SetSendBufSize(s int) {
-    sendbufferSize = s
+	sendbufferSize = s
 }
 
 func SetRecvBufSize(s int) {
-    recvbufferSize = s
+	recvbufferSize = s
 }
 
 func NewSessionID() SessionID {
-    mutex.Lock()
-    defer mutex.Unlock()
-    currentSessionId += 1
-    if currentSessionId >= math.MaxUint64 {
-        currentSessionId = 1
-    }
-    return currentSessionId
+	mutex.Lock()
+	defer mutex.Unlock()
+	currentSessionId += 1
+	if currentSessionId >= math.MaxUint64 {
+		currentSessionId = 1
+	}
+	return currentSessionId
 }

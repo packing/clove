@@ -18,71 +18,72 @@
 package nnet
 
 import (
-    "github.com/packing/nbpy/errors"
-    "github.com/packing/nbpy/utils"
-    "net"
+	"net"
+
+	"github.com/packing/clove/errors"
+	"github.com/packing/clove/utils"
 )
 
 type UnixMsg struct {
-    controller *UnixMsgController
-    isClosed   bool
+	controller *UnixMsgController
+	isClosed   bool
 
-    associatedObject interface{}
+	associatedObject interface{}
 }
 
 func CreateUnixMsg() *UnixMsg {
-    s := new(UnixMsg)
-    s.isClosed = true
-    return s
+	s := new(UnixMsg)
+	s.isClosed = true
+	return s
 }
 
 func (receiver *UnixMsg) SetControllerAssociatedObject(o interface{}) {
-    receiver.associatedObject = o
+	receiver.associatedObject = o
 }
 
 func (receiver *UnixMsg) Bind(addr string) error {
-    receiver.isClosed = true
-    unixAddr, err := net.ResolveUnixAddr("unixgram", addr)
-    if err != nil {
-        return err
-    }
+	receiver.isClosed = true
+	unixAddr, err := net.ResolveUnixAddr("unixgram", addr)
+	if err != nil {
+		return err
+	}
 
-    unixConn, err := net.ListenUnixgram("unixgram", unixAddr)
-    if err != nil {
-        return err
-    }
+	unixConn, err := net.ListenUnixgram("unixgram", unixAddr)
+	if err != nil {
+		return err
+	}
 
-    receiver.isClosed = false
-    receiver.processClient(*unixConn)
+	receiver.isClosed = false
+	receiver.processClient(*unixConn)
 
-    return nil
+	return nil
 }
 
 func (receiver *UnixMsg) processClient(conn net.UnixConn) {
-    receiver.controller = createUnixMsgController(conn)
-    receiver.controller.SetAssociatedObject(receiver.associatedObject)
+	receiver.controller = createUnixMsgController(conn)
+	receiver.controller.SetAssociatedObject(receiver.associatedObject)
 
-    receiver.controller.OnStop = func(controller Controller) error {
-        utils.LogInfo(">>> unix消息端口 %d 已经退出监听", controller.GetSessionID())
-        receiver.controller = nil
-        receiver.isClosed = true
-        return nil
-    }
+	receiver.controller.OnStop = func(controller Controller) error {
+		utils.LogInfo(">>> unix消息端口 %d 已经退出监听", controller.GetSessionID())
+		receiver.controller = nil
+		receiver.isClosed = true
+		return nil
+	}
 
-    receiver.controller.Schedule()
+	receiver.controller.Schedule()
 
 }
 
 func (receiver *UnixMsg) SendTo(addr string, fds ...int) error {
-    if receiver.isClosed {
-        return errors.ErrorDataSentIncomplete
-    }
-    return receiver.controller.SendFdTo(addr, fds...)
+	if receiver.isClosed {
+		return errors.ErrorDataSentIncomplete
+	}
+	return receiver.controller.SendFdTo(addr, fds...)
 }
 
 func (receiver *UnixMsg) Close() {
-    if !receiver.isClosed {
-        receiver.controller.Close()
-        receiver.isClosed = true
-    }
+	if !receiver.isClosed {
+		receiver.controller.Close()
+		receiver.isClosed = true
+	}
 }
