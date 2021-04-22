@@ -36,6 +36,7 @@ type Message struct {
 	messageSync      bool
 	messageTag       codecs.IMSlice
 	messageSessionId []nnet.SessionID
+	messageAdapterId nnet.SessionID
 	messageBody      codecs.IMMap
 	controller       nnet.Controller
 	messageSrcData   codecs.IMData
@@ -58,6 +59,7 @@ func MessageFromData(controller nnet.Controller, addr string, data codecs.IMData
 	msg.messageSync = reader.BoolValueOf(ProtocolKeySync)
 	msg.messageSerial = reader.IntValueOf(ProtocolKeySerial, 0)
 	msg.unixAddr = reader.StrValueOf(ProtocolKeyUnixAddr, "")
+	msg.messageAdapterId = reader.UintValueOf(ProtocolKeyKeyAdapterId, 0)
 
 	msg.messageSessionId = make([]nnet.SessionID, 0)
 	sessIds := reader.TryReadValue(ProtocolKeySessionId)
@@ -104,6 +106,7 @@ func DataFromMessage(message *Message) (codecs.IMData, error) {
 	msg[ProtocolKeyType] = message.messageType
 	msg[ProtocolKeyTag] = message.messageTag
 	msg[ProtocolKeySync] = message.messageSync
+	msg[ProtocolKeyKeyAdapterId] = message.messageAdapterId
 
 	ssid := make(codecs.IMSlice, 0)
 	for _, sid := range message.messageSessionId {
@@ -127,7 +130,16 @@ func CreateMessage(errorCode, scheme, mtype int, tag codecs.IMSlice, sync bool, 
 	msg.messageBody = body
 	msg.messageErrorCode = errorCode
 	msg.messageSerial = 0
+	msg.messageAdapterId = 0
 	return msg, nil
+}
+
+func (receiver *Message) MessageAdapterId() nnet.SessionID {
+	return receiver.messageAdapterId
+}
+
+func (receiver *Message) SetMessageAdapterId(messageAdapterId nnet.SessionID) {
+	receiver.messageAdapterId = messageAdapterId
 }
 
 func (receiver Message) GetUnixSource() string {
