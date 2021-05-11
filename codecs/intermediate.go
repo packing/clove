@@ -20,6 +20,7 @@ package codecs
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"reflect"
 	"unsafe"
@@ -657,6 +658,8 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte) {
 			return nberrors.ErrorDataTooShort, nil, nil
 		}
 	}
+
+	fmt.Println("elementType => ", elementType, " for => ", raw)
 
 	switch elementType {
 	case IMV2DataTypeInt8:

@@ -18,8 +18,6 @@
 package messages
 
 import (
-	"fmt"
-
 	"github.com/packing/clove/codecs"
 	"github.com/packing/clove/errors"
 	"github.com/packing/clove/nnet"
@@ -51,8 +49,6 @@ func MessageFromData(controller nnet.Controller, addr string, data codecs.IMData
 	if !ok {
 		return nil, ErrorDataNotIsMessageMap
 	}
-
-	fmt.Println(data)
 
 	reader := codecs.CreateMapReader(mapData)
 
