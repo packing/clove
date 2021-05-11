@@ -20,9 +20,9 @@ package codecs
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"math"
 	"reflect"
+	"strconv"
 	"unsafe"
 
 	nberrors "github.com/packing/clove/errors"
@@ -503,24 +503,25 @@ func (receiver EncoderIMv1) Encode(raw *IMData) (error, []byte) {
 */
 
 const (
-	IMV2DataTypeUnknown  = 0
-	IMV2DataTypeInt8     = 1
-	IMV2DataTypeUint8    = 2
-	IMV2DataTypeInt16    = 3
-	IMV2DataTypeUint16   = 4
-	IMV2DataTypeInt32    = 5
-	IMV2DataTypeUint32   = 6
-	IMV2DataTypeInt64    = 7
-	IMV2DataTypeUint64   = 8
-	IMV2DataTypeFloat32  = 9
-	IMV2DataTypeFloat64  = 10
-	IMV2DataTypeReserved = 11
-	IMV2DataTypeTrue     = 12
-	IMV2DataTypeFalse    = 13
-	IMV2DataTypeString   = 14
-	IMV2DataTypeBytes    = 15
-	IMV2DataTypeMap      = 16
-	IMV2DataTypeList     = 17
+	IMV2DataTypeUnknown     = 0
+	IMV2DataTypeInt8        = 1
+	IMV2DataTypeUint8       = 2
+	IMV2DataTypeInt16       = 3
+	IMV2DataTypeUint16      = 4
+	IMV2DataTypeInt32       = 5
+	IMV2DataTypeUint32      = 6
+	IMV2DataTypeInt64       = 7
+	IMV2DataTypeUint64      = 8
+	IMV2DataTypeFloat32     = 9
+	IMV2DataTypeFloat64     = 10
+	IMV2DataTypeReserved    = 11
+	IMV2DataTypeTrue        = 12
+	IMV2DataTypeFalse       = 13
+	IMV2DataTypeString      = 14
+	IMV2DataTypeBytes       = 15
+	IMV2DataTypeMap         = 16
+	IMV2DataTypeList        = 17
+	IMV2DataTypeJSBigNumber = 18
 )
 
 type DecoderIMv2 struct {
@@ -659,8 +660,6 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte) {
 		}
 	}
 
-	fmt.Println("elementType => ", elementType, " for => ", raw)
-
 	switch elementType {
 	case IMV2DataTypeInt8:
 		return nil, int(int8(realData[0])), realData[elementCount:]
@@ -697,6 +696,19 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte) {
 	case IMV2DataTypeString:
 		e := string(realData[:elementCount])
 		return nil, e, realData[elementCount:]
+	case IMV2DataTypeJSBigNumber:
+		e := string(realData[:elementCount])
+		var rr interface{} = 0
+		er, errpar := strconv.ParseInt(e, 10, 64)
+		if errpar != nil {
+			return nil, 0, realData[elementCount:]
+		}
+		if unsafe.Sizeof(0x0) == 8 {
+			rr = int(er)
+		} else {
+			rr = er
+		}
+		return nil, rr, realData[elementCount:]
 	case IMV2DataTypeBytes:
 		return nil, realData[:elementCount], realData[elementCount:]
 	case IMV2DataTypeMap:
