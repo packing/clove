@@ -52,10 +52,26 @@ type UnixMsgController struct {
 }
 
 func createUnixMsgController(ioSrc net.UnixConn) *UnixMsgController {
+	return createUnixMsgControllerWithBufferSize(ioSrc, -1, -1)
+}
+
+func createUnixMsgControllerWithBufferSize(ioSrc net.UnixConn, bufWSize int, bufRSize int) *UnixMsgController {
 	sor := new(UnixMsgController)
 	sor.ioinner = ioSrc
 	sor.id = NewSessionID()
 	sor.associatedObject = nil
+	if bufWSize >= 0 {
+		err := sor.ioinner.SetReadBuffer(bufRSize)
+		if err != nil {
+			utils.LogError("SetReadBuffer error: ", err)
+		}
+	}
+	if bufWSize >= 0 {
+		err := sor.ioinner.SetWriteBuffer(bufWSize)
+		if err != nil {
+			utils.LogError("SetWriteBuffer error: ", err)
+		}
+	}
 	return sor
 }
 

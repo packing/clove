@@ -68,6 +68,10 @@ type UnixController struct {
 }
 
 func createUnixController(ioSrc net.UnixConn, dataRW *DataReadWriter) *UnixController {
+	return createUnixControllerWithBufferSize(ioSrc, dataRW, -1, -1)
+}
+
+func createUnixControllerWithBufferSize(ioSrc net.UnixConn, dataRW *DataReadWriter, bufWSize int, bufRSize int) *UnixController {
 	sor := new(UnixController)
 	sor.recvBuffer = new(utils.MutexBuffer)
 	sor.sendBuffer = make(map[string]*UnixSendBuffer)
@@ -76,6 +80,18 @@ func createUnixController(ioSrc net.UnixConn, dataRW *DataReadWriter) *UnixContr
 	sor.id = NewSessionID()
 	sor.closeOnSended = false
 	sor.associatedObject = nil
+	if bufWSize >= 0 {
+		err := sor.ioinner.SetReadBuffer(bufRSize)
+		if err != nil {
+			utils.LogError("SetReadBuffer error: ", err)
+		}
+	}
+	if bufWSize >= 0 {
+		err := sor.ioinner.SetWriteBuffer(bufWSize)
+		if err != nil {
+			utils.LogError("SetWriteBuffer error: ", err)
+		}
+	}
 	return sor
 }
 

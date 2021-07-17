@@ -34,6 +34,11 @@ func createUnixController(ioSrc net.UnixConn, dataRW *DataReadWriter) *UnixContr
 	return sor
 }
 
+func createUnixControllerWithBufferSize(ioSrc net.UnixConn, dataRW *DataReadWriter, bufWSize int, bufRSize int) *UnixController {
+	sor := new(UnixController)
+	return sor
+}
+
 func (receiver *UnixController) SetTag(tag int) {}
 
 func (receiver *UnixController) GetTag() int { return 0 }

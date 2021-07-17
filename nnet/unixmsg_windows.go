@@ -18,19 +18,23 @@
 package nnet
 
 import (
-    "net"
+	"net"
 )
 
 type UnixMsg struct {
 }
 
 func CreateUnixMsg() *UnixMsg {
-    s := new(UnixMsg)
-    return s
+	s := new(UnixMsg)
+	return s
+}
+
+func CreateUnixMsgWithBufferSize(bufWriteSize int, bufReadSize int) *UnixMsg {
+	return CreateUnixMsg()
 }
 
 func (receiver *UnixMsg) SetControllerAssociatedObject(o interface{}) {}
-func (receiver *UnixMsg) Bind(addr string) error { return nil }
-func (receiver *UnixMsg) processClient(conn net.UnixConn) {}
-func (receiver *UnixMsg) SendTo(addr string, fds ...int) error { return nil }
-func (receiver *UnixMsg) Close() {}
+func (receiver *UnixMsg) Bind(addr string) error                      { return nil }
+func (receiver *UnixMsg) processClient(conn net.UnixConn)             {}
+func (receiver *UnixMsg) SendTo(addr string, fds ...int) error        { return nil }
+func (receiver *UnixMsg) Close()                                      {}

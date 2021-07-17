@@ -28,12 +28,21 @@ type UnixMsg struct {
 	controller *UnixMsgController
 	isClosed   bool
 
+	bufWSize int
+	bufRSize int
+
 	associatedObject interface{}
 }
 
 func CreateUnixMsg() *UnixMsg {
+	return CreateUnixMsgWithBufferSize(-1, -1)
+}
+
+func CreateUnixMsgWithBufferSize(bufWriteSize int, bufReadSize int) *UnixMsg {
 	s := new(UnixMsg)
 	s.isClosed = true
+	s.bufRSize = bufReadSize
+	s.bufWSize = bufWriteSize
 	return s
 }
 
@@ -60,7 +69,7 @@ func (receiver *UnixMsg) Bind(addr string) error {
 }
 
 func (receiver *UnixMsg) processClient(conn net.UnixConn) {
-	receiver.controller = createUnixMsgController(conn)
+	receiver.controller = createUnixMsgControllerWithBufferSize(conn, receiver.bufWSize, receiver.bufRSize)
 	receiver.controller.SetAssociatedObject(receiver.associatedObject)
 
 	receiver.controller.OnStop = func(controller Controller) error {

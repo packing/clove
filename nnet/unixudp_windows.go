@@ -35,6 +35,10 @@ func CreateUnixUDPWithFormat(format *packets.PacketFormat, codec *codecs.Codec) 
 	return s
 }
 
+func CreateUnixUDPWithFormatAndBufferSize(format *packets.PacketFormat, codec *codecs.Codec, bufWriteSize int, bufReadSize int) *UnixUDP {
+	return CreateUnixUDPWithFormat(format, codec)
+}
+
 func (receiver *UnixUDP) SetControllerAssociatedObject(o interface{}) {
 }
 

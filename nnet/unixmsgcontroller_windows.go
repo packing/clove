@@ -33,6 +33,10 @@ func createUnixMsgController(ioSrc net.UnixConn) *UnixMsgController {
 	return sor
 }
 
+func createUnixMsgControllerWithBufferSize(ioSrc net.UnixConn, bufWSize int, bufRSize int) *UnixMsgController {
+	return createUnixMsgController(ioSrc)
+}
+
 func (receiver *UnixMsgController) SetAssociatedObject(o interface{}) {
 }
 

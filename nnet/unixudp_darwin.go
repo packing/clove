@@ -35,15 +35,23 @@ type UnixUDP struct {
 	controller     *UnixController
 	isClosed       bool
 	addr           string
+	bufWSize       int
+	bufRSize       int
 
 	associatedObject interface{}
 }
 
 func CreateUnixUDPWithFormat(format *packets.PacketFormat, codec *codecs.Codec) *UnixUDP {
+	return CreateUnixUDPWithFormatAndBufferSize(format, codec, -1, -1)
+}
+
+func CreateUnixUDPWithFormatAndBufferSize(format *packets.PacketFormat, codec *codecs.Codec, bufWriteSize int, bufReadSize int) *UnixUDP {
 	s := new(UnixUDP)
 	s.Codec = codec
 	s.Format = format
 	s.isClosed = true
+	s.bufWSize = bufWriteSize
+	s.bufRSize = bufReadSize
 	return s
 }
 
@@ -78,7 +86,7 @@ func (receiver *UnixUDP) processClient(conn net.UnixConn) {
 
 	dataRW := createDataReadWriter(receiver.Codec, receiver.Format)
 	dataRW.OnDataDecoded = receiver.OnDataDecoded
-	receiver.controller = createUnixController(conn, dataRW)
+	receiver.controller = createUnixControllerWithBufferSize(conn, dataRW, receiver.bufWSize, receiver.bufRSize)
 	receiver.controller.SetAssociatedObject(receiver.associatedObject)
 
 	receiver.controller.OnStop = func(controller Controller) error {
