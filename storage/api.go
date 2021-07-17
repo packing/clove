@@ -64,15 +64,19 @@ type Client struct {
 	uniqueId  int64
 }
 
-func CreateClient(addr string, timeOut time.Duration) *Client {
+func CreateClientWithBufferSize(addr string, timeOut time.Duration, buffWriteSize int, buffReadSize int) *Client {
 	kv := new(Client)
 	kv.timeOut = timeOut
 	kv.waiters = new(sync.Map)
-	if err := kv.Initialize(addr); err != nil {
+	if err := kv.Initialize(addr, buffWriteSize, buffReadSize); err != nil {
 		utils.LogError("CreateClient error: %s", err.Error())
 		return nil
 	}
 	return kv
+}
+
+func CreateClient(addr string, timeOut time.Duration) *Client {
+	return CreateClientWithBufferSize(addr, timeOut, -1, -1)
 }
 
 func (receiver *Client) Close() {
@@ -160,7 +164,7 @@ func (receiver *Client) onKeyValueMsgRet(controller nnet.Controller, _ string, m
 	return nil
 }
 
-func (receiver *Client) Initialize(addr string) error {
+func (receiver *Client) Initialize(addr string, buffWSize int, buffRSize int) error {
 	receiver.addr = addr
 	//receiver.lookupChan = make(chan interface{}, 10240)
 	if strings.Contains(addr, ":") {
@@ -176,7 +180,7 @@ func (receiver *Client) Initialize(addr string) error {
 
 	} else {
 		receiver.unixMode = true
-		receiver.udpUnix = nnet.CreateUnixUDPWithFormat(packets.PacketFormatNB, codecs.CodecIMv2)
+		receiver.udpUnix = nnet.CreateUnixUDPWithFormatAndBufferSize(packets.PacketFormatNB, codecs.CodecIMv2, buffWSize, buffRSize)
 		receiver.udpUnix.OnDataDecoded = receiver.onKeyValueMsgRet
 		receiver.udpUnix.SetControllerAssociatedObject(receiver)
 		myAddr := fmt.Sprintf("/tmp/nbdb_client_%d.sock", os.Getpid())
