@@ -23,6 +23,7 @@ import (
 
 	"github.com/packing/clove/codecs"
 	"github.com/packing/clove/errors"
+	"github.com/packing/clove/utils"
 )
 
 /*
@@ -56,6 +57,9 @@ func (receiver PacketParserNB) Prepare(in []byte) (error, int, byte, byte, []byt
 }
 
 func (receiver PacketParserNB) TryParse(in []byte) (error, bool) {
+	defer func() {
+		utils.LogPanic(recover())
+	}()
 	if len(in) < PacketNBHeaderLength {
 		return errors.ErrorDataNotReady, false
 	}
@@ -83,6 +87,9 @@ func (receiver PacketParserNB) TryParse(in []byte) (error, bool) {
 }
 
 func (receiver PacketParserNB) Pop(in []byte) (error, *Packet, int) {
+	defer func() {
+		utils.LogPanic(recover())
+	}()
 	if len(in) < PacketNBHeaderLength {
 		return errors.ErrorDataNotReady, nil, 0
 	}
@@ -123,6 +130,9 @@ func (receiver PacketParserNB) Pop(in []byte) (error, *Packet, int) {
 }
 
 func (receiver PacketPackagerNB) Package(pck *Packet, raw []byte) (error, []byte) {
+	defer func() {
+		utils.LogPanic(recover())
+	}()
 	header := make([]byte, PacketNBHeaderLength)
 
 	var opFlag byte = 0

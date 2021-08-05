@@ -662,13 +662,14 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte) {
 
 	switch elementType {
 	case IMV2DataTypeInt8:
+		nbutils.LogInfo("v", realData[0])
 		return nil, int(int8(realData[0])), realData[elementCount:]
 	case IMV2DataTypeUint8:
-		return nil, uint(uint8(realData[0])), realData[elementCount:]
+		return nil, uint(realData[0]), realData[elementCount:]
 	case IMV2DataTypeInt16:
 		return nil, int(int16(receiver.getByteOrder().Uint16(realData))), realData[elementCount:]
 	case IMV2DataTypeUint16:
-		return nil, uint(uint16(receiver.getByteOrder().Uint16(realData))), realData[elementCount:]
+		return nil, uint(receiver.getByteOrder().Uint16(realData)), realData[elementCount:]
 	case IMV2DataTypeInt32:
 		return nil, int(int32(receiver.getByteOrder().Uint32(realData))), realData[elementCount:]
 	case IMV2DataTypeUint32:

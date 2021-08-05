@@ -48,6 +48,9 @@ type PacketPackagerWS struct {
 }
 
 func (receiver PacketParserWS) Prepare(in []byte) (error, int, byte, byte, []byte) {
+	defer func() {
+		utils.LogPanic(recover())
+	}()
 	//utils.LogInfo(">>> HTTPHEADER > %s", string(in))
 	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(in)))
 	if err != nil {
@@ -99,6 +102,9 @@ func (receiver PacketParserWS) Prepare(in []byte) (error, int, byte, byte, []byt
 }
 
 func (receiver PacketParserWS) TryParse(in []byte) (error, bool) {
+	defer func() {
+		utils.LogPanic(recover())
+	}()
 	fB := bits.ReadAsciiCode(in)
 	if fB != 71 && fB != 80 {
 		return errors.ErrorDataNotMatch, false
@@ -139,6 +145,9 @@ func (receiver PacketParserWS) TryParse(in []byte) (error, bool) {
 }
 
 func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
+	defer func() {
+		utils.LogPanic(recover())
+	}()
 	if len(in) < WSDataMinLength {
 		return errors.ErrorDataNotReady, nil, 0
 	}
@@ -219,6 +228,9 @@ func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
 }
 
 func (receiver PacketPackagerWS) Package(pck *Packet, raw []byte) (error, []byte) {
+	defer func() {
+		utils.LogPanic(recover())
+	}()
 	rawLen := len(raw)
 	header := make([]byte, 10)
 

@@ -26,6 +26,7 @@ import (
 	"github.com/packing/clove/bits"
 	"github.com/packing/clove/codecs"
 	"github.com/packing/clove/errors"
+	"github.com/packing/clove/utils"
 )
 
 const HttpHeaderMinLength = 16
@@ -41,6 +42,9 @@ func (receiver PacketParserHTTP) Prepare(in []byte) (error, int, byte, byte, []b
 }
 
 func (receiver PacketParserHTTP) TryParse(in []byte) (error, bool) {
+	defer func() {
+		utils.LogPanic(recover())
+	}()
 	fB := bits.ReadAsciiCode(in)
 	if fB != 71 && fB != 80 {
 		return errors.ErrorDataNotMatch, false
@@ -61,6 +65,9 @@ func (receiver PacketParserHTTP) TryParse(in []byte) (error, bool) {
 }
 
 func (receiver PacketParserHTTP) Pop(in []byte) (error, *Packet, int) {
+	defer func() {
+		utils.LogPanic(recover())
+	}()
 	if len(in) < HttpHeaderMinLength {
 		return errors.ErrorDataNotReady, nil, 0
 	}

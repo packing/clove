@@ -24,6 +24,7 @@ import (
 
 	"github.com/packing/clove/codecs"
 	"github.com/packing/clove/errors"
+	"github.com/packing/clove/utils"
 )
 
 /*
@@ -57,6 +58,9 @@ func (receiver PacketParserNBOrigin) Prepare(in []byte) (error, int, byte, byte,
 }
 
 func (receiver PacketParserNBOrigin) TryParse(in []byte) (error, bool) {
+	defer func() {
+		utils.LogPanic(recover())
+	}()
 	if len(in) < PacketNBOriginHeaderLength {
 		return errors.ErrorDataNotReady, false
 	}
@@ -82,6 +86,9 @@ func (receiver PacketParserNBOrigin) TryParse(in []byte) (error, bool) {
 }
 
 func (receiver PacketParserNBOrigin) Pop(in []byte) (error, *Packet, int) {
+	defer func() {
+		utils.LogPanic(recover())
+	}()
 	if len(in) < PacketNBOriginHeaderLength {
 		return errors.ErrorDataNotReady, nil, 0
 	}
@@ -122,6 +129,9 @@ func (receiver PacketParserNBOrigin) Pop(in []byte) (error, *Packet, int) {
 }
 
 func (receiver PacketPackagerNBOrigin) Package(pck *Packet, raw []byte) (error, []byte) {
+	defer func() {
+		utils.LogPanic(recover())
+	}()
 	data := make([]byte, PacketNBOriginHeaderLength)
 	binary.LittleEndian.PutUint16(data, 0x0)
 	var flag uint16 = 0
