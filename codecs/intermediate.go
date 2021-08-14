@@ -661,8 +661,9 @@ func (receiver DecoderIMv2) Decode(raw []byte) (error, IMData, []byte) {
 	}
 
 	switch elementType {
+	case IMV2DataTypeReserved:
+		return nil, nil, realData[elementCount:]
 	case IMV2DataTypeInt8:
-		nbutils.LogInfo("v", realData[0])
 		return nil, int(int8(realData[0])), realData[elementCount:]
 	case IMV2DataTypeUint8:
 		return nil, uint(realData[0]), realData[elementCount:]
@@ -759,7 +760,10 @@ func (receiver EncoderIMv2) Encode(raw *IMData) (error, []byte) {
 		nbutils.LogPanic(recover())
 	}()
 	if *raw == nil {
-		return nberrors.ErrorTypeNotSupported, []byte("")
+		rb := make([]byte, 1)
+		rb[0] = makeHeader(IMV2DataTypeReserved, 0)
+		return nil, rb
+		//return nberrors.ErrorTypeNotSupported, []byte("")
 	}
 	var rawValue = reflect.ValueOf(*raw)
 	var tpKind = rawValue.Type().Kind()
