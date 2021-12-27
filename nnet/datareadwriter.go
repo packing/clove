@@ -146,7 +146,6 @@ dataCtrl:
 		inData, peekLen = buf.Peek(pl)
 		if pl > peekLen {
 			//utils.LogError("!!! 封包解包失败，连接 %s 将被关闭2", controller.GetSource())
-			//return errors.ErrorDataNotMatch
 			break dataCtrl
 		}
 
