@@ -53,6 +53,7 @@ func createDataReadWriter(codec *codecs.Codec, format *packets.PacketFormat) *Da
 
 func (receiver *DataReadWriter) PeekPacketLength(stream []byte) int {
 	if receiver.format == nil {
+		utils.LogInfo("receiver.format", receiver.format)
 		return 0
 	}
 	err, _, readLen := receiver.format.Parser.Pop(stream)
@@ -60,6 +61,7 @@ func (receiver *DataReadWriter) PeekPacketLength(stream []byte) int {
 		if err == errors.ErrorDataNotReady {
 			return readLen
 		}
+		utils.LogInfo("PeekPacketLength", err)
 		return 0
 	}
 	return readLen
