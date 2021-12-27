@@ -349,6 +349,7 @@ func (receiver *TCPServer) Mutilcast(sessionids []SessionID, msg ...codecs.IMDat
 	for _, sessionid := range sessionids {
 		controller := receiver.getController(sessionid)
 		if controller == nil {
+			utils.LogInfo("没有找到sessionid为 %d 的目标客户端", sessionid)
 			continue
 		}
 		receiver.Send(sessionid, msg...)
