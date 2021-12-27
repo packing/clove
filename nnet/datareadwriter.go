@@ -150,6 +150,8 @@ dataCtrl:
 			break dataCtrl
 		}
 
+		utils.LogInfo("pl %d, peeklen %d", pl, peekLen)
+
 		err, packet, readLen := receiver.format.Parser.Pop(inData)
 		if err != nil {
 			if err != errors.ErrorDataNotReady {
