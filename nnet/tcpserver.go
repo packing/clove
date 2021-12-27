@@ -351,6 +351,7 @@ func (receiver *TCPServer) Mutilcast(sessionids []SessionID, msg ...codecs.IMDat
 		if controller == nil {
 			continue
 		}
+		utils.LogInfo("Mutilcast", sessionid)
 		receiver.Send(sessionid, msg...)
 	}
 }
