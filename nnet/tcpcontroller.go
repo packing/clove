@@ -293,6 +293,7 @@ func (receiver *TCPController) processRead(wg *sync.WaitGroup) {
 		n, err := receiver.ioinner.Read(b)
 		if err == nil && n > 0 {
 			IncTotalTcpRecvSize(n)
+			utils.LogVerbose(">>> 连接 %s 收到数据: %d", receiver.GetSource(), n)
 			receiver.recvBuffer.Write(b[:n])
 			receiver.runableData <- n
 			runtime.Gosched()
