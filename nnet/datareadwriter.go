@@ -148,6 +148,9 @@ dataCtrl:
 			utils.LogError("!!! 封包解包失败，连接 %s 将被关闭2", controller.GetSource())
 			return errors.ErrorDataNotMatch
 		}
+
+		utils.LogInfo("pl %d, peekLen %d", pl, peekLen)
+
 		err, packet, readLen := receiver.format.Parser.Pop(inData)
 		if err != nil {
 			if err != errors.ErrorDataNotReady {
@@ -187,11 +190,11 @@ dataCtrl:
 		}
 
 		//controller.Read(readLen)
-		//utils.LogInfo("======DataReadWriter========")
-		//utils.LogInfo("buf len => %d", buf.Len())
+		utils.LogInfo("======DataReadWriter========")
+		utils.LogInfo("buf len => %d", buf.Len())
 		buf.Next(readLen)
-		//utils.LogInfo("buf len => %d", buf.Len())
-		//utils.LogInfo("============================")
+		utils.LogInfo("buf len => %d", buf.Len())
+		utils.LogInfo("============================")
 
 		packetData := packet.Raw
 
@@ -231,6 +234,7 @@ dataCtrl:
 		err, msg, remianData := receiver.codec.Decoder.Decode(packetData)
 		if err == nil {
 			if receiver.OnDataDecoded != nil {
+				utils.LogInfo("大哥解出来了", msg)
 				IncDecodeInstanceCount()
 				err := receiver.OnDataDecoded(controller, controller.GetSource(), msg)
 				DecDecodeInstanceCount()
