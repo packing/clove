@@ -90,12 +90,12 @@ func (receiver PacketParserNBOrigin) Pop(in []byte) (error, *Packet, int) {
 		utils.LogPanic(recover())
 	}()
 	if len(in) < PacketNBOriginHeaderLength {
-		return errors.ErrorDataNotReady, nil, 0
+		return errors.ErrorDataNotReady, nil, -1
 	}
 
 	packetlen := int(binary.LittleEndian.Uint32(in[8:12]))
 	if packetlen > len(in) {
-		return errors.ErrorDataNotReady, nil, 0
+		return errors.ErrorDataNotReady, nil, -1
 	}
 
 	if packetlen < PacketNBOriginHeaderLength {

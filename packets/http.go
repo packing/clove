@@ -69,7 +69,7 @@ func (receiver PacketParserHTTP) Pop(in []byte) (error, *Packet, int) {
 		utils.LogPanic(recover())
 	}()
 	if len(in) < HttpHeaderMinLength {
-		return errors.ErrorDataNotReady, nil, 0
+		return errors.ErrorDataNotReady, nil, -1
 	}
 
 	dict := make(codecs.IMMap)
@@ -77,7 +77,7 @@ func (receiver PacketParserHTTP) Pop(in []byte) (error, *Packet, int) {
 	d := codecs.IMData(dict)
 	err, out := codecs.CodecIMv2.Encoder.Encode(&d)
 	if err != nil {
-		return errors.ErrorDataNotReady, nil, 0
+		return errors.ErrorDataNotReady, nil, -1
 	}
 
 	pck := new(Packet)

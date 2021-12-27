@@ -149,7 +149,7 @@ func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
 		utils.LogPanic(recover())
 	}()
 	if len(in) < WSDataMinLength {
-		return errors.ErrorDataNotReady, nil, 0
+		return errors.ErrorDataNotReady, nil, -1
 	}
 
 	peekData := in
@@ -181,7 +181,7 @@ func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
 	}
 
 	if len(in) < headlen {
-		return errors.ErrorDataNotReady, nil, 0
+		return errors.ErrorDataNotReady, nil, -1
 	}
 
 	mask := make([]byte, 4)
@@ -205,7 +205,7 @@ func (receiver PacketParserWS) Pop(in []byte) (error, *Packet, int) {
 
 	totalLen := headlen + int(dataLen&0xFFFFFFFF)
 	if len(in) < totalLen {
-		return errors.ErrorDataNotReady, nil, 0
+		return errors.ErrorDataNotReady, nil, -1
 	}
 
 	payloadData := in[:totalLen]
