@@ -135,7 +135,7 @@ dataCtrl:
 		inData, peekLen := buf.Peek(1024)
 		pl := receiver.PeekPacketLength(inData)
 		if pl == 0 {
-			utils.LogError("!!! 封包解包失败，连接 %s 将被关闭1", controller.GetSource())
+			utils.LogError("!!! 封包解包失败，连接 %s 将被关闭1", controller.GetSource(), peekLen, inData)
 			return errors.ErrorDataNotMatch
 		}
 		if pl == -1 {
