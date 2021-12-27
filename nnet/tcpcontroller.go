@@ -192,6 +192,7 @@ func (receiver *TCPController) Send(msg ...codecs.IMData) ([]codecs.IMData, erro
 	st := time.Now().UnixNano()
 	buf, remainMsgs, err := receiver.DataRW.PackStream(receiver, msg...)
 	utils.LogInfo("Tcp send encode: ", err, len(buf))
+	utils.LogInfo("raw ==>> ", buf)
 	IncEncodeTime(time.Now().UnixNano() - st)
 	if err == nil {
 		receiver.Write(buf)
