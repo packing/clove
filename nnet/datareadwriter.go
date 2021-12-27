@@ -139,6 +139,7 @@ dataCtrl:
 			return errors.ErrorDataNotMatch
 		}
 		if pl == -1 {
+			utils.LogInfo("pl %d, peekLen %d", pl, peekLen)
 			break dataCtrl
 		} else {
 		}
