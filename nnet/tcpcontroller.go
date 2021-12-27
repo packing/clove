@@ -191,8 +191,6 @@ func (receiver *TCPController) Send(msg ...codecs.IMData) ([]codecs.IMData, erro
 	}
 	st := time.Now().UnixNano()
 	buf, remainMsgs, err := receiver.DataRW.PackStream(receiver, msg...)
-	utils.LogInfo("Tcp send encode: ", err, len(buf))
-	utils.LogInfo("raw ==>> ", buf)
 	IncEncodeTime(time.Now().UnixNano() - st)
 	if err == nil {
 		receiver.Write(buf)
@@ -294,7 +292,6 @@ func (receiver *TCPController) processRead(wg *sync.WaitGroup) {
 		n, err := receiver.ioinner.Read(b)
 		if err == nil && n > 0 {
 			IncTotalTcpRecvSize(n)
-			utils.LogVerbose(">>> 连接 %s 收到数据: %d", receiver.GetSource(), n)
 			receiver.recvBuffer.Write(b[:n])
 			receiver.runableData <- n
 			runtime.Gosched()

@@ -139,8 +139,6 @@ dataCtrl:
 			return errors.ErrorDataNotMatch
 		}
 		if pl == -1 {
-			utils.LogInfo("rraw ==>> ", inData)
-			utils.LogInfo("pl %d, peekLen %d", pl, peekLen)
 			break dataCtrl
 		} else {
 		}
@@ -151,8 +149,6 @@ dataCtrl:
 			//return errors.ErrorDataNotMatch
 			break dataCtrl
 		}
-
-		utils.LogInfo("pl %d, peekLen %d", pl, peekLen)
 
 		err, packet, readLen := receiver.format.Parser.Pop(inData)
 		if err != nil {
@@ -193,11 +189,7 @@ dataCtrl:
 		}
 
 		//controller.Read(readLen)
-		utils.LogInfo("======DataReadWriter========")
-		utils.LogInfo("buf len => %d", buf.Len())
 		buf.Next(readLen)
-		utils.LogInfo("buf len => %d", buf.Len())
-		utils.LogInfo("============================")
 
 		packetData := packet.Raw
 
@@ -237,7 +229,6 @@ dataCtrl:
 		err, msg, remianData := receiver.codec.Decoder.Decode(packetData)
 		if err == nil {
 			if receiver.OnDataDecoded != nil {
-				utils.LogInfo("大哥解出来了", msg)
 				IncDecodeInstanceCount()
 				err := receiver.OnDataDecoded(controller, controller.GetSource(), msg)
 				DecDecodeInstanceCount()
