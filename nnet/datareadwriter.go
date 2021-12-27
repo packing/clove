@@ -58,7 +58,7 @@ func (receiver *DataReadWriter) PeekPacketLength(stream []byte) int {
 	err, _, readLen := receiver.format.Parser.Pop(stream)
 	if err != nil {
 		if err == errors.ErrorDataNotReady {
-			return -1
+			return readLen
 		}
 		return 0
 	}
@@ -146,9 +146,10 @@ dataCtrl:
 		}
 
 		inData, peekLen = buf.Peek(pl)
-		if pl != peekLen {
-			utils.LogError("!!! 封包解包失败，连接 %s 将被关闭2", controller.GetSource())
-			return errors.ErrorDataNotMatch
+		if pl > peekLen {
+			//utils.LogError("!!! 封包解包失败，连接 %s 将被关闭2", controller.GetSource())
+			//return errors.ErrorDataNotMatch
+			break dataCtrl
 		}
 
 		utils.LogInfo("pl %d, peekLen %d", pl, peekLen)

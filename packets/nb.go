@@ -115,7 +115,7 @@ func (receiver PacketParserNB) Pop(in []byte) (error, *Packet, int) {
 	}
 
 	if uint(packetLen) > uint(len(in)) {
-		return errors.ErrorDataNotReady, nil, 0
+		return errors.ErrorDataNotReady, nil, int(packetLen)
 	}
 
 	packet := new(Packet)
