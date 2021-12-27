@@ -91,7 +91,7 @@ func (receiver PacketParserNB) Pop(in []byte) (error, *Packet, int) {
 		utils.LogPanic(recover())
 	}()
 	if len(in) < PacketNBHeaderLength {
-		return errors.ErrorDataNotReady, nil, 0
+		return errors.ErrorDataNotReady, nil, -1
 	}
 
 	peekData := in
