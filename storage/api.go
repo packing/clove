@@ -315,14 +315,11 @@ func (receiver *Client) DBExec(sql string, args ...interface{}) (int64, error) {
 
 	ret, err := receiver.sendCmdWithRet(msg)
 	if err == nil {
-		retV, ok := ret.(int64)
+		sv, ok := ret.(string)
 		if ok {
-			return retV, nil
+			utils.LogError("MySQL Exec error: %s", sv)
 		} else {
-			sv, ok := ret.(string)
-			if ok {
-				utils.LogError("MySQL Exec error: %s", sv)
-			}
+			return codecs.Int64FromInterface(ret), err
 		}
 	}
 	return 0, err
