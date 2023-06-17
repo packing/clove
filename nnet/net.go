@@ -70,8 +70,8 @@ var wsCodecDefault = codecs.CodecIMv2
 
 var currentSessionId SessionID = 0
 
-var sendbufferSize = 1024
-var recvbufferSize = 1024
+var sendbufferSize = 10240
+var recvbufferSize = 10240
 
 var totalTcpSendSize = 0
 var totalTcpRecvSize = 0
