@@ -67,7 +67,7 @@ func (receiver *DataReadWriter) PeekPacketLength(stream []byte) int {
 
 func (receiver *DataReadWriter) ReadStream(controller Controller, buf *utils.MutexBuffer) error {
 
-	var inData, _ = buf.Peek(1024)
+	var inData, _ = buf.Peek(10240)
 
 	//var peekData []byte
 	//var nPeek int
@@ -121,7 +121,7 @@ func (receiver *DataReadWriter) ReadStream(controller Controller, buf *utils.Mut
 
 		if readLen > 0 {
 			buf.Next(readLen)
-			inData, _ = buf.Peek(1024)
+			inData, _ = buf.Peek(10240)
 		}
 		if buf.Len() == 0 {
 			//如果数据已经读完, 等待后续数据到达
@@ -132,7 +132,7 @@ func (receiver *DataReadWriter) ReadStream(controller Controller, buf *utils.Mut
 dataCtrl:
 	for {
 		//peekData = inData[:1024*1024]
-		inData, peekLen := buf.Peek(1024)
+		inData, peekLen := buf.Peek(10240)
 		pl := receiver.PeekPacketLength(inData)
 		if pl == 0 {
 			utils.LogError("!!! 封包解包失败，连接 %s 将被关闭1", controller.GetSource())
