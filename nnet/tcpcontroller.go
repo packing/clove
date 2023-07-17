@@ -316,28 +316,34 @@ func (receiver *TCPController) processWrite(wg *sync.WaitGroup) {
 		if ok && !receiver.closeSendReq {
 			buf := make([]byte, sendbufferSize)
 
+			sendBuffLen := receiver.sendBuffer.Len()
 		main:
-			sendBuffLen, _ := receiver.sendBuffer.Read(buf)
-			tobuf := buf[:sendBuffLen]
+			rl, _ := receiver.sendBuffer.Read(buf)
+			tobuf := buf[:rl]
 			for sendBuffLen > 0 {
+				if len(tobuf) == 0 {
+					if sendBuffLen > 0 {
+						goto main
+					} else {
+						break
+					}
+				}
 				//设置写超时，避免客户端一直不收包，导致服务器内存暴涨
 				receiver.ioinner.SetWriteDeadline(time.Now().Add(3 * time.Second))
 				sizeWrited, sendErr := receiver.ioinner.Write(tobuf)
+				tobuf = tobuf[:sizeWrited]
 				if sendErr == nil {
-					if sendBuffLen == sizeWrited {
+					sendBuffLen = sendBuffLen - sizeWrited
+					IncTotalTcpSendSize(sizeWrited)
+					if sendBuffLen == 0 {
 						if receiver.closeOnSended {
 							receiver.Close()
 						}
 
-						IncTotalTcpSendSize(sendBuffLen)
 						runtime.Gosched()
-						goto main
-					} else {
-						tobuf = tobuf[:sizeWrited]
-						sendBuffLen = sendBuffLen - sizeWrited
-						IncTotalTcpSendSize(sizeWrited)
 						continue
 					}
+					continue
 				}
 				if sendErr != nil {
 					utils.LogError(">>> 连接 %s 发送数据超时或异常，关闭连接", receiver.GetSource())
