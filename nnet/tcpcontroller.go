@@ -331,7 +331,7 @@ func (receiver *TCPController) processWrite(wg *sync.WaitGroup) {
 				//设置写超时，避免客户端一直不收包，导致服务器内存暴涨
 				receiver.ioinner.SetWriteDeadline(time.Now().Add(3 * time.Second))
 				sizeWrited, sendErr := receiver.ioinner.Write(tobuf)
-				tobuf = tobuf[:sizeWrited]
+				tobuf = tobuf[sizeWrited:]
 				if sendErr == nil {
 					sendBuffLen = sendBuffLen - sizeWrited
 					IncTotalTcpSendSize(sizeWrited)
